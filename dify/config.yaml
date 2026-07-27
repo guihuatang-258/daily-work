@@ -7,11 +7,11 @@ instance:
   timezone: Asia/Shanghai
 
 collection:
-  apps_page_size: 30
-  interactive_log_limit: 10
+  apps_page_size: 30 # 每页应用数量
+  interactive_log_limit: 10 # 每页交互日志数量
   token_stats_limit: 20
   monitor_page_size: 100
-  token_stats_workers: 10
+  token_stats_workers: 10 # 令牌统计工作线程数
 
 token_statistics:
   workflow_sample_size: 20
