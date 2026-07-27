@@ -22,22 +22,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "timezone": "Asia/Shanghai",
     },
     "collection": {
-        "request_timeout_seconds": 30,
-        "auth_timeout_seconds": 15,
         "apps_page_size": 30,
         "interactive_log_limit": 10,
         "token_stats_limit": 20,
         "monitor_page_size": 100,
         "token_stats_workers": 10,
-        "failure_check_workers": 10,
     },
     "token_statistics": {
         "workflow_sample_size": 20,
-        "estimated_prefix": "~",
-    },
-    "monitoring": {
-        "default_period": "today",
-        "failure_threshold": 0,
     },
     "applications": {
         "groups_file": "dify_flow_groups.json",
