@@ -2,12 +2,14 @@ import json
 import os
 
 import requests
+from dotenv import load_dotenv
 
 
 API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
 
 
 def stream_chat() -> None:
+    load_dotenv()
     api_key = os.environ.get("DASHSCOPE_API_KEY")
     if not api_key:
         raise RuntimeError("请先设置环境变量 DASHSCOPE_API_KEY")
