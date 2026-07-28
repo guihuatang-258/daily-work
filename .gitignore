@@ -72,6 +72,9 @@ env.bak/
 venv.bak/
 __pypackages__/
 
+# Local Dify application groups (may contain internal names and app IDs)
+dify/dify_flow_groups.json
+
 # Tool caches
 .mypy_cache/
 .dmypy.json
