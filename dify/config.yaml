@@ -13,9 +13,11 @@ collection:
   monitor_page_size: 100
   token_stats_workers: 10 # 令牌统计工作线程数
 
+# token统计相关参数
 token_statistics:
   workflow_sample_size: 20
 
+# 应用相关参数
 applications:
   groups_file: dify_flow_groups.json
   chat_modes:

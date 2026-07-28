@@ -39,7 +39,16 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    result = deepcopy(base)
+    """深度合并两个字典，优先使用 override 的值。
+
+    Args:
+        base (dict[str, Any]): _base 字典，作为默认值_
+        override (dict[str, Any]): _override 字典，用户在YAML中配置的值_
+
+    Returns:
+        dict[str, Any]: _合并后的字典_
+    """
+    result = deepcopy(base)  # 深度拷贝 base，避免修改原始字典，相当于创建了一个新的字典对象
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(result.get(key), dict):
             result[key] = _deep_merge(result[key], value)
@@ -74,6 +83,7 @@ def load_config(path: str | Path | None = None) -> dict[str, Any]:
 
 def get_config_value(config: dict[str, Any], path: str, default: Any = None) -> Any:
     value: Any = config
+    # 按照路径逐级获取配置值
     for key in path.split("."):
         if not isinstance(value, dict) or key not in value:
             return default
