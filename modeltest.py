@@ -8,6 +8,15 @@ from dotenv import load_dotenv
 API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
 
 
+def extract_delta_content(chunk: dict) -> str:
+    choices = chunk.get("choices") or []
+    if not choices:
+        return ""
+
+    delta = choices[0].get("delta") or {}
+    return delta.get("content") or ""
+
+
 def stream_chat() -> None:
     load_dotenv()
     api_key = os.environ.get("DASHSCOPE_API_KEY")
@@ -49,7 +58,7 @@ def stream_chat() -> None:
                 break
 
             chunk = json.loads(data)
-            content = chunk["choices"][0].get("delta", {}).get("content")
+            content = extract_delta_content(chunk)
             if content:
                 print(content, end="", flush=True)
 
