@@ -1,0 +1,24 @@
+{
+  "groups": {
+    "example_workflows": {
+      "display_name": "示例 Workflow 组",
+      "apps": [
+        {
+          "name": "示例 Workflow 应用",
+          "app_id": "00000000-0000-0000-0000-000000000001",
+          "mode": "workflow"
+        }
+      ]
+    },
+    "example_chatflows": {
+      "display_name": "示例 Chatflow 组",
+      "apps": [
+        {
+          "name": "示例 Chatflow 应用",
+          "app_id": "00000000-0000-0000-0000-000000000002",
+          "mode": "advanced-chat"
+        }
+      ]
+    }
+  }
+}
