@@ -132,16 +132,28 @@ class TimeRangeTests(unittest.TestCase):
 
     def test_relative_periods_include_expected_days(self) -> None:
         cases = {
-            "yesterday": ("昨天", "2026-07-21 00:00:00"),
-            "3d": ("最近 3 天", "2026-07-20 00:00:00"),
-            "7d": ("最近 7 天", "2026-07-16 00:00:00"),
+            "yesterday": (
+                "昨天",
+                "2026-07-21 00:00:00",
+                "2026-07-21 23:59:59",
+            ),
+            "3d": (
+                "最近 3 天",
+                "2026-07-20 00:00:00",
+                "2026-07-22 23:59:59",
+            ),
+            "7d": (
+                "最近 7 天",
+                "2026-07-16 00:00:00",
+                "2026-07-22 23:59:59",
+            ),
         }
-        for period, (expected_label, expected_start) in cases.items():
+        for period, (expected_label, expected_start, expected_end) in cases.items():
             with self.subTest(period=period):
                 label, start, end = get_monitoring_time_range(period, self.now)
                 self.assertEqual(label, expected_label)
                 self.assertEqual(start.strftime("%Y-%m-%d %H:%M:%S"), expected_start)
-                self.assertEqual(end.strftime("%Y-%m-%d %H:%M:%S"), "2026-07-22 23:59:59")
+                self.assertEqual(end.strftime("%Y-%m-%d %H:%M:%S"), expected_end)
 
     def test_unknown_period_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
