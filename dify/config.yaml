@@ -2,9 +2,12 @@
 # 可通过环境变量 DIFY_MONITOR_CONFIG 指向其他 YAML 文件。
 
 instance:
-  name: nezha-production
-  base_url: https://nezha.cn-pgcloud.com
+  name: nezha-production # 替换成你自己的dify名称
+  base_url: https://dify.aiadtech.com # 替换成你自己的dify地址
   timezone: Asia/Shanghai
+
+authentication:
+  type: authorization # 可选值: cookie, authorization
 
 collection:
   apps_page_size: 30 # 每页应用数量
