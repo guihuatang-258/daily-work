@@ -384,7 +384,7 @@ def run_cookie_refresh() -> int:
     except (RuntimeError, SystemExit) as exc:
         print(f"\nCookie 更新未完成: {exc}")
         exit_code = 2
-    if os.getenv(COOKIE_REFRESH_POPUP_ENV) == "1":
+    if exit_code != 0 and os.getenv(COOKIE_REFRESH_POPUP_ENV) == "1":
         try:
             input("\n按回车键关闭此窗口...")
         except EOFError:

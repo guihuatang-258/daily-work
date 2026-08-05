@@ -27,6 +27,7 @@ from nezha_api.cli import (
     pick_failure_check_group,
     pick_flow_group_token_period,
     pick_generic_workflow_action,
+    run_cookie_refresh,
 )
 from nezha_api.flow_groups import get_monitoring_time_range, load_flow_group
 from nezha_api.markdown import table
@@ -378,6 +379,18 @@ class ClientAndAuthTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
+    @patch.dict("os.environ", {"NEZHA_COOKIE_REFRESH_POPUP": "1"})
+    @patch("builtins.input")
+    @patch("nezha_api.cli.ensure_valid_auth_headers")
+    def test_successful_cookie_refresh_closes_popup_automatically(
+        self, ensure_auth, popup_input
+    ) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = run_cookie_refresh()
+        self.assertEqual(result, 0)
+        ensure_auth.assert_called_once_with()
+        popup_input.assert_not_called()
+
     @patch("nezha_api.cli.refresh_auth_in_new_console", return_value=True)
     @patch(
         "nezha_api.cli.validate_auth_headers",
