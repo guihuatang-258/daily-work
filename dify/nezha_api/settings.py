@@ -10,6 +10,13 @@ CONFIG = load_config()
 
 BASE_URL = str(get_config_value(CONFIG, "instance.base_url")).rstrip("/")
 INSTANCE_NAME = str(get_config_value(CONFIG, "instance.name", "default"))
+AUTH_TYPE = str(
+    get_config_value(CONFIG, "authentication.type", "cookie")
+).strip().lower()
+if AUTH_TYPE not in {"cookie", "authorization"}:
+    raise RuntimeError(
+        "配置 authentication.type 只能是 cookie 或 authorization"
+    )
 
 try:
     MONITOR_TIMEZONE = ZoneInfo(

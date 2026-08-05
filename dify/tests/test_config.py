@@ -31,6 +31,8 @@ class ConfigTests(unittest.TestCase):
             path.write_text(
                 "instance:\n"
                 "  base_url: https://dify.example.com\n"
+                "authentication:\n"
+                "  type: authorization\n"
                 "collection:\n"
                 "  token_stats_workers: 4\n",
                 encoding="utf-8",
@@ -42,6 +44,10 @@ class ConfigTests(unittest.TestCase):
         )
         self.assertEqual(
             require_positive_int(config, "collection.token_stats_workers"), 4
+        )
+        self.assertEqual(
+            get_config_value(config, "authentication.type"),
+            "authorization",
         )
         self.assertEqual(
             get_config_value(config, "collection.monitor_page_size"), 100

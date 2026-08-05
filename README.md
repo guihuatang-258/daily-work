@@ -70,6 +70,9 @@ instance:
   base_url: https://dify.example.com
   timezone: Asia/Shanghai
 
+authentication:
+  type: cookie
+
 collection:
   apps_page_size: 30
   interactive_log_limit: 10
@@ -94,6 +97,7 @@ applications:
 | `instance.name` | Dify 实例名称 |
 | `instance.base_url` | Dify Console 地址 |
 | `instance.timezone` | IANA 时区名称 |
+| `authentication.type` | 认证方式：`cookie` 或 `authorization` |
 | `collection.apps_page_size` | 应用列表每页数量 |
 | `collection.interactive_log_limit` | 交互查询默认日志数量 |
 | `collection.token_stats_limit` | Token 查询每页数量 |
@@ -122,7 +126,14 @@ python analyze_nezha_apis.py
 Copy-Item .env.example .env
 ```
 
-编辑 `.env`：
+先根据目标 Dify 实例使用的认证方式编辑 `config.yaml`：
+
+```yaml
+authentication:
+  type: cookie # 或 authorization
+```
+
+Cookie 认证编辑 `.env`：
 
 ```env
 NEZHA_COOKIE="粘贴浏览器请求中的完整 Cookie"
@@ -130,7 +141,15 @@ NEZHA_COOKIE="粘贴浏览器请求中的完整 Cookie"
 
 Cookie 必须包含 `__Host-csrf_token`。程序会自动将该值作为 `X-CSRF-Token` 请求头。
 
-获取方式：在已登录 Dify Console 的浏览器中打开开发者工具，在 Network 面板选择 `/console/api/` 请求，然后复制 Request Headers 中的完整 Cookie。
+Authorization 认证编辑 `.env`：
+
+```env
+DIFY_AUTHORIZATION="粘贴浏览器请求中的完整 Authorization 值"
+```
+
+例如浏览器请求头是 `Authorization: Bearer eyJ...`，应保存 `Bearer eyJ...`。程序会原样发送该值，不会自动添加 `Bearer`。
+
+获取方式：在已登录 Dify Console 的浏览器中打开开发者工具，在 Network 面板选择 `/console/api/` 请求，然后从 Request Headers 中复制对应的完整 Cookie 或 Authorization 值。
 
 > `.env` 包含登录凭证，严禁提交到仓库或发送给其他人。
 
@@ -205,9 +224,9 @@ python -m unittest discover -s tests -v
 
 ## 常见问题
 
-- **Cookie 或 Token 已过期：** 重新复制完整 Cookie 并更新 `.env`。
+- **Cookie 或 Authorization 已过期：** 按 `authentication.type` 对应的方式重新复制认证值并更新 `.env`。
 - **缺少 `__Host-csrf_token`：** 当前 Cookie 不完整或来源请求不正确。
-- **HTTP 401/403：** Cookie 过期、CSRF 不匹配或账号没有权限。
+- **HTTP 401/403：** 认证值过期、认证方式不匹配或账号没有权限。
 - **HTTP 429：** 请求频率过高，应降低并发或稍后重试。
 - **配置时区报错：** 使用有效的 IANA 时区，例如 `Asia/Shanghai`、`Asia/Taipei`。
 - **统计数字带 `~`：** 该结果由抽样数据估算，并非精确总量。

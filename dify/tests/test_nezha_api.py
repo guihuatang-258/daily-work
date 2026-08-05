@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from nezha_api.auth import build_auth_headers
+from nezha_api.auth import build_auth_headers, load_auth_headers
 from nezha_api.client import (
     list_all_apps,
     list_all_chat_conversations_in_range,
@@ -343,6 +343,29 @@ class ClientAndAuthTests(unittest.TestCase):
         self.assertEqual(headers["X-CSRF-Token"], "csrf-value")
         self.assertIn("foo=bar", headers["Cookie"])
 
+    def test_auth_headers_support_authorization(self) -> None:
+        headers = build_auth_headers(
+            "Bearer token-value", "authorization"
+        )
+        self.assertEqual(headers["Authorization"], "Bearer token-value")
+        self.assertNotIn("Cookie", headers)
+        self.assertNotIn("X-CSRF-Token", headers)
+
+    def test_load_authorization_from_env_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            env_path = Path(directory) / ".env"
+            env_path.write_text(
+                'DIFY_AUTHORIZATION="Bearer saved-token"\n',
+                encoding="utf-8",
+            )
+            with patch.dict("os.environ", {}, clear=True):
+                headers = load_auth_headers(env_path, "authorization")
+        self.assertEqual(headers["Authorization"], "Bearer saved-token")
+
+    def test_auth_headers_reject_unknown_auth_type(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "认证类型"):
+            build_auth_headers("secret", "unknown")
+
     @patch("nezha_api.client.request_json", return_value={"data": []})
     def test_workflow_logs_support_server_side_status_filter(
         self, request_json
@@ -409,7 +432,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(headers, {"Cookie": "new"})
         self.assertEqual(load_headers.call_count, 2)
         refresh_console.assert_called_once_with()
-        self.assertIn("正在打开 Cookie 更新窗口", buffer.getvalue())
+        self.assertIn("正在打开认证信息更新窗口", buffer.getvalue())
         self.assertIn("继续执行失败运行检查", buffer.getvalue())
 
     @patch("nezha_api.cli.load_flow_groups")

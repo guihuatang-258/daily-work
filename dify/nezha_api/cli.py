@@ -355,14 +355,14 @@ def load_scheduled_auth_headers() -> dict:
     if status == "error":
         raise RuntimeError(message)
 
-    print(f"{message}，正在打开 Cookie 更新窗口...")
+    print(f"{message}，正在打开认证信息更新窗口...")
     if not refresh_auth_in_new_console():
-        raise RuntimeError("Cookie 未更新，已取消本次检查")
+        raise RuntimeError("认证信息未更新，已取消本次检查")
     headers = load_auth_headers()
     status, message = validate_auth_headers(headers)
     if status != "valid":
-        raise RuntimeError(f"Cookie 更新后校验失败: {message}")
-    print("Cookie 更新成功，继续执行失败运行检查。")
+        raise RuntimeError(f"认证信息更新后校验失败: {message}")
+    print("认证信息更新成功，继续执行失败运行检查。")
     return headers
 
 
@@ -380,9 +380,9 @@ def run_cookie_refresh() -> int:
     exit_code = 0
     try:
         ensure_valid_auth_headers()
-        print("\nCookie 已更新，原定时检查将自动继续。")
+        print("\n认证信息已更新，原定时检查将自动继续。")
     except (RuntimeError, SystemExit) as exc:
-        print(f"\nCookie 更新未完成: {exc}")
+        print(f"\n认证信息更新未完成: {exc}")
         exit_code = 2
     if exit_code != 0 and os.getenv(COOKIE_REFRESH_POPUP_ENV) == "1":
         try:

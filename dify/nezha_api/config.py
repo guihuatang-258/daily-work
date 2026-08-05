@@ -21,6 +21,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "base_url": "https://nezha.cn-pgcloud.com",
         "timezone": "Asia/Shanghai",
     },
+    "authentication": {
+        "type": "cookie",
+    },
     "collection": {
         "apps_page_size": 30,
         "interactive_log_limit": 10,
