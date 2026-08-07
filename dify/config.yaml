@@ -3,11 +3,11 @@
 
 instance:
   name: nezha-production # 替换成你自己的dify名称
-  base_url: https://dify.aiadtech.com # 替换成你自己的dify地址
+  base_url: https://nezha.cn-pgcloud.com # 替换成你自己的dify地址
   timezone: Asia/Shanghai
 
 authentication:
-  type: authorization # 可选值: cookie, authorization
+  type: cookie # 可选值: cookie, authorization
 
 collection:
   apps_page_size: 30 # 每页应用数量
