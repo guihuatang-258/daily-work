@@ -12,6 +12,7 @@
 - 查看 Workflow 最近运行记录及节点执行详情
 - 统计 Workflow 和 Chatflow 的运行量、异常数及 Token 消耗
 - 按业务组汇总应用
+- 通过交互菜单增删改查业务组及组内应用
 - 检查指定业务组当天的失败运行
 - 将结果输出为便于复制的 Markdown 表格
 - 在 Cookie 失效时提示更新认证信息
@@ -160,7 +161,9 @@ DIFY_AUTHORIZATION="粘贴浏览器请求中的完整 Authorization 值"
 
 ## 配置应用分组
 
-编辑 `dify_flow_groups.json`：
+推荐运行 `python main.py`，在主菜单选择“管理 · 业务组”。菜单支持查看、新增、修改和删除业务组，以及从当前 Dify 应用列表中选择要添加或移除的应用。删除本地业务组或移除组内应用不会删除 Dify Console 中的真实应用。
+
+也可以手动编辑 `dify_flow_groups.json`：
 
 ```json
 {

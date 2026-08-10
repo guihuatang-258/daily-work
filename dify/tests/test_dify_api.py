@@ -22,6 +22,7 @@ from dify_api.client import (
 from dify_api.cli import (
     choose_query_mode,
     load_scheduled_auth_headers,
+    manage_flow_groups,
     normalize_query_mode,
     pick_app_token_period,
     pick_failure_check_group,
@@ -659,7 +660,8 @@ class CliTests(unittest.TestCase):
         self.assertIn("│  [1] 查询 · Workflow", output)
         self.assertIn("│  [2] 查询 · Chatflow", output)
         self.assertIn("│  [3] 检查 ·", output)
-        self.assertIn("│  [4] 统计 · Coach 组 Token 消耗", output)
+        self.assertIn("│  [4] 管理 · 业务组", output)
+        self.assertIn("│  [5] 统计 · Coach 组 Token 消耗", output)
         self.assertIn("└─ [0] 退出", output)
         self.assertNotIn("## ", output)
         self.assertNotIn("`1`", output)
@@ -680,6 +682,29 @@ class CliTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             result = choose_query_mode()
         self.assertEqual(result, "failure-check")
+
+    @patch("dify_api.cli.load_flow_groups")
+    @patch("builtins.input", return_value="4")
+    def test_main_menu_routes_group_management(
+        self, _input, load_groups
+    ) -> None:
+        load_groups.return_value = {}
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = choose_query_mode()
+        self.assertEqual(result, "manage-groups")
+
+    @patch("dify_api.cli.load_groups_for_management", return_value={})
+    @patch("builtins.input", return_value="0")
+    def test_group_management_menu_can_return(
+        self, _input, _load_groups
+    ) -> None:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            manage_flow_groups({})
+        output = buffer.getvalue()
+        self.assertIn("┌─ 管理业务组", output)
+        self.assertIn("│  [2] 新增业务组", output)
+        self.assertIn("└─ [0] 返回主界面", output)
 
     @patch("dify_api.cli.print_group_failure_report")
     @patch("dify_api.cli.load_flow_groups")
