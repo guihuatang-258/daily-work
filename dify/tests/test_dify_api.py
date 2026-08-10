@@ -679,24 +679,24 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, "exit")
         self.assertIn("┌─ Dify 日志查询工具", output)
         self.assertNotIn("质检打分 Workflow", output)
-        self.assertIn("│  [1] 查询 · Workflow", output)
-        self.assertIn("│  [2] 查询 · Chatflow", output)
-        self.assertIn("│  [3] 检查 ·", output)
-        self.assertIn("│  [4] 管理 · 业务组", output)
-        self.assertIn("│  [5] 统计 · Coach 组 Token 消耗", output)
+        self.assertIn("│  [1] 检查 ·", output)
+        self.assertIn("│  [2] 查询 · Workflow", output)
+        self.assertIn("│  [3] 查询 · Chatflow", output)
+        self.assertIn("│  [4] 统计 · Coach 组 Token 消耗", output)
+        self.assertIn("│  [5] 管理 · 业务组", output)
         self.assertIn("└─ [0] 退出", output)
         self.assertNotIn("## ", output)
         self.assertNotIn("`1`", output)
 
     def test_main_menu_shortcuts_shift_forward(self) -> None:
-        self.assertEqual(normalize_query_mode(""), "workflow")
-        self.assertEqual(normalize_query_mode("1"), "workflow")
-        self.assertEqual(normalize_query_mode("2"), "chatflow")
-        self.assertIsNone(normalize_query_mode("3"))
+        self.assertIsNone(normalize_query_mode(""))
+        self.assertIsNone(normalize_query_mode("1"))
+        self.assertEqual(normalize_query_mode("2"), "workflow")
+        self.assertEqual(normalize_query_mode("3"), "chatflow")
         self.assertIsNone(normalize_query_mode("quality-workflow"))
 
     @patch("dify_api.cli.load_flow_groups")
-    @patch("builtins.input", return_value="3")
+    @patch("builtins.input", return_value="1")
     def test_main_menu_routes_failure_check(
         self, _input, load_groups
     ) -> None:
@@ -706,14 +706,28 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, "failure-check")
 
     @patch("dify_api.cli.load_flow_groups")
-    @patch("builtins.input", return_value="4")
+    @patch("builtins.input", return_value="5")
     def test_main_menu_routes_group_management(
         self, _input, load_groups
     ) -> None:
-        load_groups.return_value = {}
+        load_groups.return_value = {
+            "coach": {"display_name": "Coach 组", "apps": []}
+        }
         with contextlib.redirect_stdout(io.StringIO()):
             result = choose_query_mode()
         self.assertEqual(result, "manage-groups")
+
+    @patch("dify_api.cli.load_flow_groups")
+    @patch("builtins.input", return_value="4")
+    def test_main_menu_routes_group_stats_before_management(
+        self, _input, load_groups
+    ) -> None:
+        load_groups.return_value = {
+            "coach": {"display_name": "Coach 组", "apps": []}
+        }
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = choose_query_mode()
+        self.assertEqual(result, "flow-group:coach")
 
     @patch("dify_api.cli.load_groups_for_management", return_value={})
     @patch("builtins.input", return_value="0")

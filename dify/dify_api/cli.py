@@ -82,9 +82,9 @@ def normalize_query_mode(raw: str) -> str | None:
     value = raw.strip().lower()
     if value in {"0", "q", "quit", "exit"}:
         return "exit"
-    if value in {"", "1", "workflow", "generic", "generic-workflow"}:
+    if value in {"2", "workflow", "generic", "generic-workflow"}:
         return "workflow"
-    if value in {"2", "chatflow", "chat"}:
+    if value in {"3", "chatflow", "chat"}:
         return "chatflow"
     return None
 
@@ -524,13 +524,12 @@ def choose_query_mode() -> str:
             groups = {}
         group_choices = {
             str(index): group_name
-            for index, group_name in enumerate(groups, start=5)
+            for index, group_name in enumerate(groups, start=4)
         }
         options = [
-            ("1", "查询 · Workflow"),
-            ("2", "查询 · Chatflow"),
-            ("3", "检查 · 失败的 Run"),
-            ("4", "管理 · 业务组"),
+            ("1", "检查 · 失败的 Run"),
+            ("2", "查询 · Workflow"),
+            ("3", "查询 · Chatflow"),
         ]
         for choice, group_name in group_choices.items():
             group = groups[group_name]
@@ -538,6 +537,8 @@ def choose_query_mode() -> str:
             options.append(
                 (choice, f"统计 · {display_name} Token 消耗")
             )
+        manage_choice = str(len(options) + 1)
+        options.append((manage_choice, "管理 · 业务组"))
         raw = choose_menu(
             "Dify 日志查询工具",
             options,
@@ -545,9 +546,9 @@ def choose_query_mode() -> str:
             prompt="请选择功能 [默认 1] › ",
             default_key="1",
         )
-        if raw == "3":
+        if raw == "1":
             return "failure-check"
-        if raw == "4":
+        if raw == manage_choice:
             return "manage-groups"
         if raw in group_choices:
             return f"flow-group:{group_choices[raw]}"
@@ -555,7 +556,7 @@ def choose_query_mode() -> str:
         if query_mode:
             return query_mode
         valid_choices = "、".join(
-            ["0", "1", "2", "3", "4", *group_choices]
+            ["0", *(choice for choice, _label in options)]
         )
         print(f"  ! 请输入 {valid_choices}，或直接回车。")
 
