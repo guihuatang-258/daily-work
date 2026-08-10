@@ -23,6 +23,7 @@ from dify_api.cli import (
     add_group_app_interactively,
     choose_query_mode,
     load_scheduled_auth_headers,
+    main,
     manage_flow_groups,
     normalize_query_mode,
     pick_app_token_period,
@@ -608,6 +609,26 @@ class ClientAndAuthTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
+    @patch("dify_api.cli.manage_flow_groups")
+    @patch(
+        "dify_api.cli.choose_query_mode",
+        side_effect=["manage-groups", "exit"],
+    )
+    @patch("dify_api.cli.ensure_expected_workspace")
+    @patch(
+        "dify_api.cli.ensure_valid_auth_headers",
+        return_value={"Cookie": "test"},
+    )
+    def test_main_validates_workspace_only_once_at_startup(
+        self, ensure_auth, ensure_workspace, _choose_mode, manage_groups
+    ) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = main([])
+        self.assertEqual(result, 0)
+        ensure_auth.assert_called_once_with()
+        ensure_workspace.assert_called_once_with({"Cookie": "test"})
+        manage_groups.assert_called_once_with({"Cookie": "test"})
+
     @patch.dict("os.environ", {"NEZHA_COOKIE_REFRESH_POPUP": "1"})
     @patch("builtins.input")
     @patch("dify_api.cli.ensure_valid_auth_headers")

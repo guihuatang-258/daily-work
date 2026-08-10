@@ -696,11 +696,6 @@ def main(argv: list[str] | None = None) -> int:
         if query_mode == "exit":
             print("已退出。")
             return 0
-        try:
-            ensure_expected_workspace(headers, announce=False)
-        except RuntimeError as exc:
-            print(f"程序无法继续: {exc}")
-            return 2
         if query_mode == "failure-check":
             pick_failure_check_group(headers)
             continue
