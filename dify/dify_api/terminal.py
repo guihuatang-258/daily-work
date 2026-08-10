@@ -244,7 +244,10 @@ def choose_multiple(
             if use_color and line_color:
                 line = f"{line_color}{line}{RESET}"
             prefix = "\r\033[2K" if rendered else ""
-            stream.write(f"{prefix}{line}\n")
+            if prefix:
+                stream.write(prefix)
+            stream.write(line)
+            stream.write("\n")
         stream.flush()
         rendered = True
 

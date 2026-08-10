@@ -1,6 +1,7 @@
 """终端配色行为测试。"""
 
 import os
+import re
 import unittest
 from io import StringIO
 from unittest.mock import patch
@@ -8,6 +9,7 @@ from unittest.mock import patch
 from dify_api.terminal import (
     BOLD_CYAN,
     CYAN,
+    ColorStream,
     GREEN,
     RED,
     RESET,
@@ -77,6 +79,18 @@ class TerminalTests(unittest.TestCase):
             )
         self.assertNotIn(BOLD_CYAN, stream.getvalue())
         self.assertNotIn(RESET, stream.getvalue())
+
+    def test_multiple_choice_first_render_keeps_lines_with_color_stream(self):
+        wrapped = FakeTTY()
+        choose_multiple(
+            ["应用一", "应用二", "应用三"],
+            lambda item: item,
+            "选择应用",
+            key_reader=lambda: "enter",
+            stream=ColorStream(wrapped),
+        )
+        plain_output = re.sub(r"\x1b\[[0-9;]*m", "", wrapped.getvalue())
+        self.assertIn("│    [ ] 应用二\n│    [ ] 应用三\n└─", plain_output)
 
     def test_multiple_choice_can_cancel(self):
         selected = choose_multiple(
