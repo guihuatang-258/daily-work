@@ -49,6 +49,72 @@ Referer: https://nezha.cn-pgcloud.com/console/apps
 
 部分接口只返回 `limit`、`has_more` 和 `data`，不一定包含 `page` 或 `total`。
 
+### 1.5 Workspace 列表与当前 Workspace
+
+脚本在认证成功后会先调用此接口，确认 Dify 服务端当前选中的 Workspace，避免使用另一个 Workspace 的应用 ID 发起查询。
+
+#### 请求
+
+```http
+GET /console/api/workspaces
+```
+
+该接口不需要查询参数，认证方式与其他 Console API 相同。
+
+#### 返回示例
+
+以下 ID 和名称均为脱敏示例：
+
+```json
+{
+  "workspaces": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "name": "示例 Workspace A",
+      "plan": "sandbox",
+      "status": "normal",
+      "created_at": 1780000000,
+      "current": false
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "name": "示例 Workspace B",
+      "plan": "sandbox",
+      "status": "normal",
+      "created_at": 1780000100,
+      "current": true
+    }
+  ]
+}
+```
+
+#### 关键字段
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `workspaces[].id` | string | Workspace 的唯一 ID |
+| `workspaces[].name` | string | Workspace 名称 |
+| `workspaces[].current` | boolean | 是否为网页当前选中的 Workspace |
+| `workspaces[].status` | string | Workspace 当前状态 |
+| `workspaces[].plan` | string | Workspace 使用的套餐 |
+
+#### 如何取得并配置 Workspace ID
+
+1. 在浏览器中打开对应的 Dify 控制台，并切换到需要统计的 Workspace。
+2. 按 `F12` 打开开发者工具，进入“网络（Network）”。
+3. 刷新页面，找到 `GET /console/api/workspaces` 请求。
+4. 在响应中的 `workspaces` 数组里找到 `current: true` 的对象。
+5. 复制该对象的 `id`，填入 `config.yaml`：
+
+```yaml
+instance:
+  workspace_id: "00000000-0000-0000-0000-000000000002"
+```
+
+脚本会比较配置的 `workspace_id` 与接口返回的当前 Workspace ID。两者一致才继续查询；不一致时会停止，提示先切换 Workspace。网页切换 Workspace 后，同一应用列表接口返回的 Workflow/Chatflow 也会随之变化，因为 Console API 会按服务端当前 Workspace 过滤数据。
+
+> 当前兼容方案使用 `GET /console/api/workspaces` 返回的 `current` 字段判断当前 Workspace，不使用 `GET /console/api/workspaces/current`；后者在部分部署中不支持 GET 请求并会返回 `405 Method Not Allowed`。
+
 ## 2. 应用列表
 
 ### 2.1 请求
@@ -477,6 +543,8 @@ Chatflow 可以直接从消息 usage 精确汇总 input、output 和 total，无
 
 ## 8. API 调用关系
 
+所有查询在认证成功后，都会先调用 `GET /console/api/workspaces`，将 `current: true` 的 Workspace ID 与 `config.yaml` 中的 `instance.workspace_id` 比较。校验通过后才进入下面的应用和日志查询流程。
+
 ### 8.1 Workflow
 
 ```text
@@ -516,5 +584,8 @@ Console API 的错误响应结构可能因网关而异，脚本主要根据 HTTP
 | `400` | 参数不合法，例如 `limit` 超过后端上限 | 打印请求失败 |
 | `401` | Cookie 或 Token 已过期 | 提示更新认证信息 |
 | `403` | CSRF 校验失败或无权限 | 启动认证校验判定为失效 |
+| `404` | 应用 ID 不属于当前 Workspace，或请求路径在该部署中不存在 | 打印请求失败 |
 | `429` | 请求过于频繁 | 当前打印失败；应降低并发或增加重试 |
 | `5xx` | 服务端或网关异常 | 当前打印失败，不覆盖认证配置 |
+
+Workspace 配置不一致通常不会表现为 HTTP 错误：脚本会在请求应用日志前主动停止，并显示当前 Workspace 与配置 Workspace 的名称和 ID，避免后续接口返回容易误解的 `404`。
