@@ -1,6 +1,7 @@
 """应用配置和默认参数。"""
 
 from pathlib import Path
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .config import PROJECT_DIR, get_config_value, load_config, require_positive_int
@@ -10,6 +11,14 @@ CONFIG = load_config()
 
 BASE_URL = str(get_config_value(CONFIG, "instance.base_url")).rstrip("/")
 INSTANCE_NAME = str(get_config_value(CONFIG, "instance.name", "default"))
+WORKSPACE_ID = str(
+    get_config_value(CONFIG, "instance.workspace_id", "") or ""
+).strip()
+if WORKSPACE_ID:
+    try:
+        WORKSPACE_ID = str(UUID(WORKSPACE_ID))
+    except ValueError as exc:
+        raise RuntimeError("配置 instance.workspace_id 必须是有效的 UUID") from exc
 AUTH_TYPE = str(
     get_config_value(CONFIG, "authentication.type", "cookie")
 ).strip().lower()

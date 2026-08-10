@@ -5,6 +5,7 @@ instance:
   name: nezha-production # 替换成你自己的dify名称
   base_url: https://nezha.cn-pgcloud.com # 替换成你自己的dify地址
   timezone: Asia/Shanghai
+  workspace_id: 7bd9ea66-1c30-4483-8b1c-5a9d0d0d338d # GenCare
 
 authentication:
   type: cookie # 可选值: cookie, authorization

@@ -31,6 +31,7 @@ class ConfigTests(unittest.TestCase):
             path.write_text(
                 "instance:\n"
                 "  base_url: https://dify.example.com\n"
+                "  workspace_id: 00000000-0000-0000-0000-000000000001\n"
                 "authentication:\n"
                 "  type: authorization\n"
                 "collection:\n"
@@ -41,6 +42,10 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(
             get_config_value(config, "instance.base_url"),
             "https://dify.example.com",
+        )
+        self.assertEqual(
+            get_config_value(config, "instance.workspace_id"),
+            "00000000-0000-0000-0000-000000000001",
         )
         self.assertEqual(
             require_positive_int(config, "collection.token_stats_workers"), 4

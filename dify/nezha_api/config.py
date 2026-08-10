@@ -20,6 +20,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "name": "default",
         "base_url": "https://nezha.cn-pgcloud.com",
         "timezone": "Asia/Shanghai",
+        "workspace_id": "",
     },
     "authentication": {
         "type": "cookie",

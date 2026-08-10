@@ -23,6 +23,7 @@ from .reports import (
     print_workflow_run,
 )
 from .settings import API0_LIMIT, CHAT_APP_MODES, INTERACTIVE_LOG_LIMIT
+from .workspace import ensure_expected_workspace
 
 
 TOKEN_PERIOD_OPTIONS = [
@@ -351,6 +352,7 @@ def load_scheduled_auth_headers() -> dict:
     else:
         status, message = validate_auth_headers(headers)
     if status == "valid":
+        ensure_expected_workspace(headers)
         return headers
     if status == "error":
         raise RuntimeError(message)
@@ -363,6 +365,7 @@ def load_scheduled_auth_headers() -> dict:
     if status != "valid":
         raise RuntimeError(f"认证信息更新后校验失败: {message}")
     print("认证信息更新成功，继续执行失败运行检查。")
+    ensure_expected_workspace(headers)
     return headers
 
 
@@ -403,11 +406,21 @@ def main(argv: list[str] | None = None) -> int:
     if args.check_failures:
         return run_failure_check(args.check_failures)
     headers = ensure_valid_auth_headers()
+    try:
+        ensure_expected_workspace(headers)
+    except RuntimeError as exc:
+        print(f"程序无法启动: {exc}")
+        return 2
     while True:
         query_mode = choose_query_mode()
         if query_mode == "exit":
             print("已退出。")
             return 0
+        try:
+            ensure_expected_workspace(headers, announce=False)
+        except RuntimeError as exc:
+            print(f"程序无法继续: {exc}")
+            return 2
         if query_mode == "failure-check":
             pick_failure_check_group(headers)
             continue

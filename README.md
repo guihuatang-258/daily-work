@@ -69,6 +69,7 @@ instance:
   name: production
   base_url: https://dify.example.com
   timezone: Asia/Shanghai
+  workspace_id: 00000000-0000-0000-0000-000000000001
 
 authentication:
   type: cookie
@@ -97,6 +98,7 @@ applications:
 | `instance.name` | Dify 实例名称 |
 | `instance.base_url` | Dify Console 地址 |
 | `instance.timezone` | IANA 时区名称 |
+| `instance.workspace_id` | 期望使用的 Workspace UUID；不一致时停止运行 |
 | `authentication.type` | 认证方式：`cookie` 或 `authorization` |
 | `collection.apps_page_size` | 应用列表每页数量 |
 | `collection.interactive_log_limit` | 交互查询默认日志数量 |
@@ -108,6 +110,8 @@ applications:
 | `applications.chat_modes` | 需要按 Chatflow 处理的应用类型 |
 
 所有正整数参数都会在程序启动时校验。配置文件不存在时，程序使用内置默认值，以兼容旧版运行方式。
+
+`workspace_id` 留空时跳过 Workspace 校验。建议多 Workspace 账号务必填写，防止网页切换 Workspace 后查询到另一套应用。可以在浏览器开发者工具的 Network 面板查看 `/console/api/workspaces` 响应，找到 `current: true` 对象的 `id`。
 
 ### 使用其他配置文件
 
@@ -227,6 +231,7 @@ python -m unittest discover -s tests -v
 - **Cookie 或 Authorization 已过期：** 按 `authentication.type` 对应的方式重新复制认证值并更新 `.env`。
 - **缺少 `__Host-csrf_token`：** 当前 Cookie 不完整或来源请求不正确。
 - **HTTP 401/403：** 认证值过期、认证方式不匹配或账号没有权限。
+- **当前 Workspace 与配置不一致：** 在 Dify 网页切回提示的 Workspace，再重新运行程序。
 - **HTTP 429：** 请求频率过高，应降低并发或稍后重试。
 - **配置时区报错：** 使用有效的 IANA 时区，例如 `Asia/Shanghai`、`Asia/Taipei`。
 - **统计数字带 `~`：** 该结果由抽样数据估算，并非精确总量。

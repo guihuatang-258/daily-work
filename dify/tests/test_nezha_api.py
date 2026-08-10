@@ -45,6 +45,7 @@ from nezha_api.stats import (
     evenly_sample_workflow_runs,
     normalize_quality_user_id,
 )
+from nezha_api.workspace import ensure_expected_workspace, get_current_workspace
 
 
 class MarkdownTests(unittest.TestCase):
@@ -244,6 +245,7 @@ class DomainTests(unittest.TestCase):
             [app["name"] for app in group["apps"]],
             [
                 "【ISA】知识库检索",
+                "【ISA】质检打分",
                 "【ISA】案例库-对话数据提取",
                 "【ISA】案例库-生成案例",
                 "【ISA】问答交互",
@@ -366,6 +368,47 @@ class ClientAndAuthTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "认证类型"):
             build_auth_headers("secret", "unknown")
 
+    @patch("nezha_api.workspace.requests.get")
+    def test_get_current_workspace_uses_current_flag(self, request_get) -> None:
+        request_get.return_value.json.return_value = {
+            "workspaces": [
+                {"id": "workspace-1", "name": "First", "current": False},
+                {"id": "workspace-2", "name": "Second", "current": True},
+            ]
+        }
+        current = get_current_workspace({"Cookie": "test"})
+        self.assertEqual(current["id"], "workspace-2")
+        request_get.assert_called_once()
+
+    @patch("nezha_api.workspace.WORKSPACE_ID", "workspace-1")
+    @patch("nezha_api.workspace.get_current_workspace")
+    def test_workspace_validation_accepts_expected_workspace(
+        self, get_workspace
+    ) -> None:
+        get_workspace.return_value = {
+            "id": "workspace-1",
+            "name": "Production",
+            "current": True,
+        }
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            current = ensure_expected_workspace({"Cookie": "test"})
+        self.assertEqual(current["id"], "workspace-1")
+        self.assertIn("Workspace 校验成功：Production", buffer.getvalue())
+
+    @patch("nezha_api.workspace.WORKSPACE_ID", "workspace-expected")
+    @patch("nezha_api.workspace.get_current_workspace")
+    def test_workspace_validation_rejects_wrong_workspace(
+        self, get_workspace
+    ) -> None:
+        get_workspace.return_value = {
+            "id": "workspace-current",
+            "name": "Wrong Workspace",
+            "current": True,
+        }
+        with self.assertRaisesRegex(RuntimeError, "请在 Dify 网页切回"):
+            ensure_expected_workspace({"Cookie": "test"})
+
     @patch("nezha_api.client.request_json", return_value={"data": []})
     def test_workflow_logs_support_server_side_status_filter(
         self, request_json
@@ -415,6 +458,7 @@ class CliTests(unittest.TestCase):
         popup_input.assert_not_called()
 
     @patch("nezha_api.cli.refresh_auth_in_new_console", return_value=True)
+    @patch("nezha_api.cli.ensure_expected_workspace")
     @patch(
         "nezha_api.cli.validate_auth_headers",
         side_effect=[
@@ -424,7 +468,7 @@ class CliTests(unittest.TestCase):
     )
     @patch("nezha_api.cli.load_auth_headers", return_value={"Cookie": "new"})
     def test_scheduled_check_refreshes_expired_cookie_in_new_console(
-        self, load_headers, _validate, refresh_console
+        self, load_headers, _validate, ensure_workspace, refresh_console
     ) -> None:
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
@@ -432,6 +476,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(headers, {"Cookie": "new"})
         self.assertEqual(load_headers.call_count, 2)
         refresh_console.assert_called_once_with()
+        ensure_workspace.assert_called_once_with({"Cookie": "new"})
         self.assertIn("正在打开认证信息更新窗口", buffer.getvalue())
         self.assertIn("继续执行失败运行检查", buffer.getvalue())
 
