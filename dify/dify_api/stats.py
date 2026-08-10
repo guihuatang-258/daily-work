@@ -9,13 +9,11 @@ from .client import (
     get_node_executions,
     list_all_chat_conversations_in_range,
     list_all_workflow_logs_in_range,
-    list_workflow_logs,
 )
 from .progress import format_progress
 from .settings import (
     CHAT_APP_MODES,
     MONITOR_PAGE_LIMIT,
-    TOKEN_STATS_LIMIT,
     TOKEN_STATS_WORKERS,
     WORKFLOW_TOKEN_SAMPLE_SIZE,
 )
@@ -101,34 +99,6 @@ def get_chat_conversation_usage_from_messages(
     return input_tokens, output_tokens, total_tokens, failed_messages, complete
 
 
-def get_run_usage(
-    headers: dict, app_id: str, run_id: str
-) -> tuple[int, float, str, str] | None:
-    """返回 (tokens, price, user_id, rule_name)。"""
-    _, data = get_node_executions(headers, app_id, run_id)
-    if not data:
-        return None
-    nodes = data if isinstance(data, list) else data.get("data", [])
-    total_tokens = 0
-    total_price = 0.0
-    user_id = ""
-    rule_name = ""
-    for node in nodes:
-        node_type = node.get("node_type")
-        if node_type == "llm":
-            metadata = node.get("execution_metadata", {})
-            total_tokens += token_int(metadata.get("total_tokens"))
-            try:
-                total_price += float(metadata.get("total_price") or 0)
-            except (ValueError, TypeError):
-                pass
-        elif node_type == "start":
-            inputs = node.get("inputs", {})
-            user_id = inputs.get("sys.user_id") or ""
-            rule_name = inputs.get("ruleName") or ""
-    return total_tokens, total_price, user_id, rule_name
-
-
 def get_workflow_run_token_breakdown(
     headers: dict, app_id: str, run_id: str
 ) -> tuple[int, int, int] | None:
@@ -185,50 +155,6 @@ def evenly_sample_workflow_runs(
         for index in range(sample_size)
     }
     return [candidates[index] for index in sorted(indexes)]
-
-
-def normalize_quality_user_id(raw_user_id: object) -> str:
-    user_id = str(raw_user_id or "").strip()
-    base_user_id, separator, quality_item_id = user_id.rpartition("-")
-    if separator and base_user_id and quality_item_id.isdigit():
-        return base_user_id
-    return user_id
-
-
-def collect_quality_workflow_stats(headers: dict, app_id: str) -> dict:
-    logs_url, logs_data = list_workflow_logs(
-        headers, app_id=app_id, page=1, limit=TOKEN_STATS_LIMIT, detail=True
-    )
-    logs = (logs_data or {}).get("data", [])
-    user_groups: dict[str, list] = {}
-    if logs:
-        print(
-            f"正在并行拉取 {len(logs)} 条节点数据 "
-            f"(并发 {TOKEN_STATS_WORKERS})..."
-        )
-
-        def fetch_one(item: dict) -> tuple:
-            workflow_run = item.get("workflow_run", {})
-            run_id = workflow_run.get("id") or item.get("id")
-            usage = get_run_usage(dict(headers), app_id, run_id)
-            return run_id, workflow_run.get("status"), usage
-
-        with ThreadPoolExecutor(max_workers=TOKEN_STATS_WORKERS) as pool:
-            futures = [pool.submit(fetch_one, item) for item in logs]
-            for done, future in enumerate(as_completed(futures), start=1):
-                run_id, status, usage = future.result()
-                print(
-                    f"  {format_progress(done, len(logs))} · "
-                    f"质检节点数据"
-                )
-                if usage is None:
-                    continue
-                tokens, price, user_id, rule_name = usage
-                uid = normalize_quality_user_id(user_id) or "?"
-                user_groups.setdefault(uid, []).append(
-                    (run_id, status, tokens, price, rule_name)
-                )
-    return {"url": logs_url, "logs": logs, "user_groups": user_groups}
 
 
 def collect_flow_group_token_stats(

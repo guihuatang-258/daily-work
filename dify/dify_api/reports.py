@@ -5,11 +5,10 @@ from datetime import datetime
 from pathlib import Path
 
 from .flow_groups import get_monitoring_time_range, load_flow_group
-from .markdown import cell, print_section, print_table, print_urls
+from .markdown import print_section, print_table
 from .settings import CHAT_APP_MODES, WORKFLOW_TOKEN_SAMPLE_SIZE
 from .stats import (
     collect_flow_group_token_stats,
-    collect_quality_workflow_stats,
     get_item_id,
 )
 
@@ -20,10 +19,6 @@ def _format_integer(
     prefix = "~" if estimated else ""
     suffix = " *" if incomplete else ""
     return f"{prefix}{value:,}{suffix}"
-
-
-def _format_price(value: float) -> str:
-    return f"{value:,.6f}"
 
 
 def print_workflow_apps(data: dict | None) -> None:
@@ -167,45 +162,6 @@ def print_recent_workflow_logs(logs: list[dict]) -> None:
             for run in [item.get("workflow_run", {})]
         ],
         ["right", "left", "center", "left", "right", "right"],
-    )
-
-
-def print_quality_workflow_token_stats(headers: dict, app_id: str) -> None:
-    result = collect_quality_workflow_stats(headers, app_id)
-    print_urls({"Token 统计 -> 日志 API": result["url"]})
-    if not result["logs"]:
-        print("该工作流没有查询到最近日志。")
-        return
-    user_groups = result["user_groups"]
-    print_section("Token 消耗统计（按用户分组）")
-    print(f"- **应用 ID：** `{app_id}`")
-    print(f"- **用户数：** {len(user_groups)}\n")
-    grand_tokens = 0
-    grand_price = 0.0
-    for user_id, group_rows in user_groups.items():
-        user_tokens = sum(row[2] for row in group_rows)
-        user_price = sum(row[3] for row in group_rows)
-        grand_tokens += user_tokens
-        grand_price += user_price
-        print(f"### 用户 `{cell(user_id or '?')}`\n")
-        print(f"- **质检项数：** {len(group_rows)}")
-        print(f"- **Tokens：** {_format_integer(user_tokens)}")
-        print(f"- **费用：** ¥{_format_price(user_price)}\n")
-        print_table(
-            ["质检项", "运行 ID", "状态", "Tokens", "费用（RMB）"],
-            [
-                [rule_name or "?", run_id, status,
-                 _format_integer(tokens) if tokens is not None else "ERROR",
-                 _format_price(price) if price is not None else "ERROR"]
-                for run_id, status, tokens, price, rule_name in group_rows
-            ],
-            ["left", "left", "center", "right", "right"],
-        )
-    print("### 汇总\n")
-    print_table(
-        ["用户数", "Tokens", "费用（RMB）"],
-        [[len(user_groups), _format_integer(grand_tokens), _format_price(grand_price)]],
-        ["right", "right", "right"],
     )
 
 

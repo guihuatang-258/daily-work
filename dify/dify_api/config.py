@@ -28,7 +28,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "collection": {
         "apps_page_size": 30,
         "interactive_log_limit": 10,
-        "token_stats_limit": 20,
         "monitor_page_size": 100,
         "token_stats_workers": 10,
     },

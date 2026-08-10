@@ -29,7 +29,6 @@ from .monitor import print_group_failure_report
 from .reports import (
     print_apps_token_stats,
     print_flow_group_token_stats,
-    print_quality_workflow_token_stats,
     print_recent_workflow_logs,
     print_workflow_run,
 )
@@ -90,7 +89,7 @@ def normalize_query_mode(raw: str) -> str | None:
 
 
 def filter_apps_by_mode(apps: list[dict], query_mode: str) -> list[dict]:
-    if query_mode in {"workflow", "quality-workflow"}:
+    if query_mode == "workflow":
         return [app for app in apps if app.get("mode") == "workflow"]
     if query_mode == "chatflow":
         return [app for app in apps if app.get("mode") in CHAT_APP_MODES]
@@ -139,25 +138,6 @@ def view_recent_workflow_logs(headers: dict, app_id: str) -> None:
     run_url, run_data = get_workflow_run(headers, app_id=app_id, run_id=run_id)
     print_urls({"运行详情 API": run_url})
     print_workflow_run(run_data, output_path=f"workflow_run_{run_id}.json")
-
-
-def pick_quality_workflow_action(headers: dict, app_id: str) -> None:
-    choice = choose_menu(
-        "质检打分 Workflow",
-        [
-            ("1", "查看最近日志（选一条查看运行详情）"),
-            ("2", "按用户和质检项统计最近 Token 消耗"),
-        ],
-        ("0", "取消"),
-    )
-    if not choice or choice == "0":
-        print("已取消。")
-    elif choice == "2":
-        print_quality_workflow_token_stats(headers, app_id)
-    elif choice == "1":
-        view_recent_workflow_logs(headers, app_id)
-    else:
-        print("无效选择。")
 
 
 def pick_generic_workflow_action(headers: dict, app: dict) -> None:
@@ -563,7 +543,6 @@ def choose_query_mode() -> str:
 
 def interactive_pick_workflow_run(headers: dict, query_mode: str) -> None:
     mode_labels = {
-        "quality-workflow": "质检打分 Workflow",
         "workflow": "通用 Workflow",
         "chatflow": "Chatflow",
     }
@@ -594,9 +573,7 @@ def interactive_pick_workflow_run(headers: dict, query_mode: str) -> None:
     if not selected_app:
         print("已取消。")
         return
-    if query_mode == "quality-workflow":
-        pick_quality_workflow_action(headers, selected_app["id"])
-    elif query_mode == "workflow":
+    if query_mode == "workflow":
         pick_generic_workflow_action(headers, selected_app)
     else:
         pick_app_token_period(headers, selected_app)

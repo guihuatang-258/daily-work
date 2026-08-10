@@ -38,7 +38,6 @@ API0_LIMIT = require_positive_int(CONFIG, "collection.apps_page_size")
 INTERACTIVE_LOG_LIMIT = require_positive_int(
     CONFIG, "collection.interactive_log_limit"
 )
-TOKEN_STATS_LIMIT = require_positive_int(CONFIG, "collection.token_stats_limit")
 MONITOR_PAGE_LIMIT = require_positive_int(CONFIG, "collection.monitor_page_size")
 TOKEN_STATS_WORKERS = require_positive_int(CONFIG, "collection.token_stats_workers")
 WORKFLOW_TOKEN_SAMPLE_SIZE = require_positive_int(

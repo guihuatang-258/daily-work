@@ -44,10 +44,7 @@ from dify_api.reports import (
     print_workflow_run,
 )
 from dify_api.settings import MONITOR_TIMEZONE
-from dify_api.stats import (
-    evenly_sample_workflow_runs,
-    normalize_quality_user_id,
-)
+from dify_api.stats import evenly_sample_workflow_runs
 from dify_api.workspace import ensure_expected_workspace, get_current_workspace
 
 
@@ -330,10 +327,6 @@ class DomainTests(unittest.TestCase):
                 "【ISA】生成追问话术",
             ],
         )
-
-    def test_quality_user_suffix_is_removed(self) -> None:
-        self.assertEqual(normalize_quality_user_id("user-123-4"), "user-123")
-        self.assertEqual(normalize_quality_user_id("user-alpha"), "user-alpha")
 
     def test_workflow_sampling_is_even(self) -> None:
         logs = [{"workflow_run": {"id": str(index)}} for index in range(10)]
@@ -693,7 +686,6 @@ class CliTests(unittest.TestCase):
         self.assertIsNone(normalize_query_mode("1"))
         self.assertEqual(normalize_query_mode("2"), "workflow")
         self.assertEqual(normalize_query_mode("3"), "chatflow")
-        self.assertIsNone(normalize_query_mode("quality-workflow"))
 
     @patch("dify_api.cli.load_flow_groups")
     @patch("builtins.input", return_value="1")
