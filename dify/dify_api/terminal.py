@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import sys
+import unicodedata
 from io import TextIOBase
+from typing import Callable, TypeVar
 
 from colorama import just_fix_windows_console
 
@@ -17,6 +20,9 @@ DIM = "\033[2m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
 RED = "\033[31m"
+
+
+T = TypeVar("T")
 
 
 _MENU_TITLE_RE = re.compile(r"^(\s*┌─\s*)(.+)$")
@@ -63,6 +69,192 @@ def style_text(text: str) -> str:
     if stripped.startswith("请选择") or stripped.startswith("请输入"):
         return f"{CYAN}{text}{RESET}"
     return text
+
+
+def read_navigation_key() -> str:
+    """读取一次导航按键，并归一化为 up/down/space/enter/cancel。"""
+    if os.name == "nt":
+        import msvcrt
+
+        char = msvcrt.getwch()
+        if char in {"\x00", "\xe0"}:
+            return {"H": "up", "P": "down"}.get(msvcrt.getwch(), "other")
+        return {
+            " ": "space",
+            "\r": "enter",
+            "\n": "enter",
+            "\x1b": "cancel",
+            "\x03": "cancel",
+            "q": "cancel",
+            "Q": "cancel",
+        }.get(char, "other")
+
+    import select
+    import termios
+    import tty
+
+    file_descriptor = sys.stdin.fileno()
+    previous_settings = termios.tcgetattr(file_descriptor)
+    try:
+        tty.setraw(file_descriptor)
+        char = sys.stdin.read(1)
+        if char == "\x1b":
+            sequence = ""
+            for _ in range(2):
+                ready, _, _ = select.select([sys.stdin], [], [], 0.05)
+                if not ready:
+                    break
+                sequence += sys.stdin.read(1)
+            return {"[A": "up", "[B": "down"}.get(sequence, "cancel")
+        return {
+            " ": "space",
+            "\r": "enter",
+            "\n": "enter",
+            "\x03": "cancel",
+            "q": "cancel",
+            "Q": "cancel",
+        }.get(char, "other")
+    finally:
+        termios.tcsetattr(file_descriptor, termios.TCSADRAIN, previous_settings)
+
+
+def _fallback_choose_multiple(
+    items: list[T],
+    labels: list[str],
+    title: str,
+    input_func: Callable[[str], str],
+    stream: TextIOBase,
+) -> list[T] | None:
+    print(f"\n{title}", file=stream)
+    for index, label in enumerate(labels, start=1):
+        print(f"  [{index}] {label}", file=stream)
+    while True:
+        raw = input_func(
+            "请输入一个或多个编号（用逗号分隔，直接回车取消）› "
+        ).strip()
+        if not raw:
+            return None
+        parts = [part.strip() for part in raw.replace("，", ",").split(",")]
+        if not all(part.isdigit() for part in parts):
+            print(
+                "  ! 请输入数字编号，多个编号之间用逗号分隔。",
+                file=stream,
+            )
+            continue
+        indexes = [int(part) - 1 for part in parts]
+        if any(index < 0 or index >= len(items) for index in indexes):
+            print(f"  ! 编号超出范围，请输入 1-{len(items)}。", file=stream)
+            continue
+        return [items[index] for index in dict.fromkeys(indexes)]
+
+
+def _display_width(text: str) -> int:
+    return sum(
+        0 if unicodedata.combining(char)
+        else 2 if unicodedata.east_asian_width(char) in {"W", "F"}
+        else 1
+        for char in text
+    )
+
+
+def _truncate_display(text: str, max_width: int) -> str:
+    if _display_width(text) <= max_width:
+        return text
+    result: list[str] = []
+    used_width = 0
+    content_width = max(max_width - 1, 0)
+    for char in text:
+        char_width = _display_width(char)
+        if used_width + char_width > content_width:
+            break
+        result.append(char)
+        used_width += char_width
+    return "".join(result) + "…"
+
+
+def choose_multiple(
+    items: list[T],
+    label_func: Callable[[T], str],
+    title: str,
+    *,
+    key_reader: Callable[[], str] | None = None,
+    stream: TextIOBase | None = None,
+    input_func: Callable[[str], str] | None = None,
+) -> list[T] | None:
+    """方向键移动焦点、空格切换选择、回车确认的终端多选列表。"""
+    if not items:
+        return []
+    stream = stream or sys.stdout
+    input_func = input_func or input
+    labels = [label_func(item) for item in items]
+    if key_reader is None and not (
+        getattr(sys.stdin, "isatty", lambda: False)()
+        and getattr(stream, "isatty", lambda: False)()
+    ):
+        return _fallback_choose_multiple(items, labels, title, input_func, stream)
+
+    key_reader = key_reader or read_navigation_key
+    focus_index = 0
+    selected_indexes: set[int] = set()
+    rendered = False
+    terminal_size = shutil.get_terminal_size(fallback=(100, 24))
+    terminal_width = max(terminal_size.columns, 20)
+    visible_count = min(len(items), max(terminal_size.lines - 4, 3))
+    line_count = visible_count + 2
+
+    def render() -> None:
+        nonlocal rendered
+        if rendered:
+            stream.write(f"\033[{line_count}F")
+        viewport_start = min(
+            max(focus_index - visible_count // 2, 0),
+            len(items) - visible_count,
+        )
+        viewport_end = viewport_start + visible_count
+        lines = [
+            (
+                f"{title}（{focus_index + 1}/{len(items)}，"
+                f"已选 {len(selected_indexes)}）"
+            ),
+            "↑/↓ 移动  空格 选择  Enter 确认  Q 取消",
+        ]
+        for index in range(viewport_start, viewport_end):
+            label = labels[index]
+            focus = "›" if index == focus_index else " "
+            checkbox = "[✓]" if index in selected_indexes else "[ ]"
+            prefix = f"{focus} {checkbox} "
+            available_width = max(terminal_width - _display_width(prefix) - 1, 1)
+            displayed_label = _truncate_display(label, available_width)
+            lines.append(f"{prefix}{displayed_label}")
+        for line in lines:
+            line = _truncate_display(line, terminal_width - 1)
+            stream.write(f"\r\033[2K{line}\n" if rendered else f"{line}\n")
+        stream.flush()
+        rendered = True
+
+    render()
+    while True:
+        key = key_reader()
+        if key == "up":
+            focus_index = (focus_index - 1) % len(items)
+            render()
+        elif key == "down":
+            focus_index = (focus_index + 1) % len(items)
+            render()
+        elif key == "space":
+            if focus_index in selected_indexes:
+                selected_indexes.remove(focus_index)
+            else:
+                selected_indexes.add(focus_index)
+            render()
+        elif key == "enter":
+            stream.write("\n")
+            stream.flush()
+            return [items[index] for index in sorted(selected_indexes)]
+        elif key == "cancel":
+            stream.write("\n")
+            stream.flush()
+            return None
 
 
 class ColorStream:

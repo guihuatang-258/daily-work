@@ -20,6 +20,7 @@ from dify_api.client import (
     list_workflow_logs,
 )
 from dify_api.cli import (
+    add_group_app_interactively,
     choose_query_mode,
     load_scheduled_auth_headers,
     manage_flow_groups,
@@ -705,6 +706,47 @@ class CliTests(unittest.TestCase):
         self.assertIn("┌─ 管理业务组", output)
         self.assertIn("│  [2] 新增业务组", output)
         self.assertIn("└─ [0] 返回主界面", output)
+
+    @patch("dify_api.cli.save_group_changes", return_value=True)
+    @patch("dify_api.cli.choose_multiple")
+    @patch("dify_api.cli.list_all_apps")
+    def test_group_management_can_add_multiple_apps_at_once(
+        self, list_apps, choose_multiple, save_changes
+    ) -> None:
+        existing = {"id": "app-1", "name": "已有", "mode": "workflow"}
+        first = {"id": "app-2", "name": "应用二", "mode": "workflow"}
+        second = {
+            "id": "app-3",
+            "name": "应用三",
+            "mode": "advanced-chat",
+        }
+        list_apps.return_value = (["https://example.test/apps"], [
+            existing,
+            first,
+            second,
+        ])
+        choose_multiple.return_value = [first, second]
+        groups = {
+            "support": {
+                "display_name": "支持组",
+                "apps": [{
+                    "name": "已有",
+                    "app_id": "app-1",
+                    "mode": "workflow",
+                }],
+            }
+        }
+        with patch("builtins.input", return_value=""):
+            with contextlib.redirect_stdout(io.StringIO()):
+                add_group_app_interactively({}, groups, "support")
+
+        candidates = choose_multiple.call_args.args[0]
+        self.assertEqual([app["id"] for app in candidates], ["app-2", "app-3"])
+        saved_groups = save_changes.call_args.args[0]
+        self.assertEqual(
+            [app["app_id"] for app in saved_groups["support"]["apps"]],
+            ["app-1", "app-2", "app-3"],
+        )
 
     @patch("dify_api.cli.print_group_failure_report")
     @patch("dify_api.cli.load_flow_groups")

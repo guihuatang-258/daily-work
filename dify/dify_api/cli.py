@@ -38,6 +38,7 @@ from .settings import (
     FLOW_GROUPS_PATH,
     INTERACTIVE_LOG_LIMIT,
 )
+from .terminal import choose_multiple
 from .workspace import ensure_expected_workspace
 
 
@@ -352,36 +353,40 @@ def add_group_app_interactively(
         for index, url in enumerate(app_urls, start=1)
     })
     apps = filter_apps_by_name(all_apps, keyword)
+    existing_app_ids = {
+        str(app.get("app_id")) for app in groups[group_name].get("apps", [])
+    }
     supported_apps = [
         app
         for app in apps
-        if app.get("mode") == "workflow" or app.get("mode") in CHAT_APP_MODES
+        if (
+            app.get("mode") == "workflow" or app.get("mode") in CHAT_APP_MODES
+        )
+        and str(app.get("id")) not in existing_app_ids
     ]
     if not supported_apps:
-        print("没有找到可加入业务组的 Workflow 或 Chatflow 应用。")
+        print("没有找到尚未加入该组的 Workflow 或 Chatflow 应用。")
         return
-    print_console_menu(
+    selected_apps = choose_multiple(
+        supported_apps,
+        lambda app: f"{app.get('name') or '<未命名>'} [{app.get('mode')}]",
         "选择要添加的应用",
-        [
-            (
-                str(index),
-                f"{app.get('name') or '<未命名>'} [{app.get('mode')}]",
-            )
-            for index, app in enumerate(supported_apps, start=1)
-        ],
-        ("Enter", "取消"),
     )
-    selected = choose_item(supported_apps, "应用")
-    if not selected:
+    if selected_apps is None:
         print("已取消。")
         return
+    if not selected_apps:
+        print("没有选择应用。")
+        return
+    updated = groups
     try:
-        updated = add_app_to_flow_group(groups, group_name, selected)
+        for app in selected_apps:
+            updated = add_app_to_flow_group(updated, group_name, app)
     except ValueError as exc:
         print(f"无法添加应用: {exc}")
         return
     if save_group_changes(updated):
-        print("应用已加入业务组。")
+        print(f"已将 {len(selected_apps)} 个应用加入业务组。")
 
 
 def remove_group_app_interactively(

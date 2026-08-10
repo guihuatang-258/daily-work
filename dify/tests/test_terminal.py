@@ -11,6 +11,7 @@ from dify_api.terminal import (
     GREEN,
     RED,
     RESET,
+    choose_multiple,
     color_enabled,
     style_text,
 )
@@ -46,6 +47,59 @@ class TerminalTests(unittest.TestCase):
             with patch.dict(os.environ, {}, clear=False):
                 os.environ.pop("NO_COLOR", None)
                 self.assertTrue(color_enabled(StringIO()))
+
+    def test_multiple_choice_supports_focus_and_selection(self):
+        keys = iter(["space", "down", "down", "space", "enter"])
+        stream = FakeTTY()
+        selected = choose_multiple(
+            ["应用一", "应用二", "应用三"],
+            lambda item: item,
+            "选择应用",
+            key_reader=lambda: next(keys),
+            stream=stream,
+        )
+        self.assertEqual(selected, ["应用一", "应用三"])
+        self.assertIn("[✓] 应用一", stream.getvalue())
+        self.assertIn("空格 选择", stream.getvalue())
+
+    def test_multiple_choice_can_cancel(self):
+        selected = choose_multiple(
+            ["应用一"],
+            lambda item: item,
+            "选择应用",
+            key_reader=lambda: "cancel",
+            stream=FakeTTY(),
+        )
+        self.assertIsNone(selected)
+
+    @patch(
+        "dify_api.terminal.shutil.get_terminal_size",
+        return_value=os.terminal_size((80, 6)),
+    )
+    def test_multiple_choice_scrolls_long_lists(self, _terminal_size):
+        keys = iter(["down", "down", "down", "down", "space", "enter"])
+        stream = FakeTTY()
+        selected = choose_multiple(
+            [f"应用{index}" for index in range(1, 7)],
+            lambda item: item,
+            "选择应用",
+            key_reader=lambda: next(keys),
+            stream=stream,
+        )
+        self.assertEqual(selected, ["应用5"])
+        self.assertIn("5/6", stream.getvalue())
+        self.assertIn("应用5", stream.getvalue())
+
+    def test_multiple_choice_falls_back_to_comma_separated_numbers(self):
+        answers = iter(["1,3"])
+        selected = choose_multiple(
+            ["应用一", "应用二", "应用三"],
+            lambda item: item,
+            "选择应用",
+            stream=StringIO(),
+            input_func=lambda _prompt: next(answers),
+        )
+        self.assertEqual(selected, ["应用一", "应用三"])
 
 
 if __name__ == "__main__":
