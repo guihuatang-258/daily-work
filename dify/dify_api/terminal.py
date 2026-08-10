@@ -85,9 +85,10 @@ def read_navigation_key() -> str:
             "\n": "enter",
             "\x1b": "cancel",
             "\x03": "cancel",
+            "\x08": "backspace",
             "q": "cancel",
             "Q": "cancel",
-        }.get(char, "other")
+        }.get(char, f"digit:{char}" if char.isdigit() else "other")
 
     import select
     import termios
@@ -111,9 +112,10 @@ def read_navigation_key() -> str:
             "\r": "enter",
             "\n": "enter",
             "\x03": "cancel",
+            "\x7f": "backspace",
             "q": "cancel",
             "Q": "cancel",
-        }.get(char, "other")
+        }.get(char, f"digit:{char}" if char.isdigit() else "other")
     finally:
         termios.tcsetattr(file_descriptor, termios.TCSADRAIN, previous_settings)
 
@@ -274,6 +276,201 @@ def choose_multiple(
             stream.write("\n")
             stream.flush()
             return None
+
+
+def _fallback_choose_menu(
+    title: str,
+    options: list[tuple[str, str]],
+    footer: tuple[str, str] | None,
+    prompt: str,
+    default_key: str | None,
+    input_func: Callable[[str], str],
+    stream: TextIOBase,
+) -> str | None:
+    print(file=stream)
+    print(f"┌─ {title}", file=stream)
+    for key, label in options:
+        print(f"│  [{key}] {label}", file=stream)
+    if footer:
+        print(f"└─ [{footer[0]}] {footer[1]}", file=stream)
+    else:
+        print("└─", file=stream)
+
+    valid_keys = {key for key, _ in options}
+    if footer and footer[0] != "Enter":
+        valid_keys.add(footer[0])
+    cancel_key = footer[0] if footer and footer[0] != "Enter" else None
+    while True:
+        raw = input_func(prompt).strip()
+        if not raw:
+            return default_key
+        if raw in {"q", "Q"}:
+            return cancel_key
+        if raw in valid_keys:
+            return raw
+        choices = "、".join(key for key, _ in options)
+        if footer and footer[0] != "Enter":
+            choices = f"{choices}、{footer[0]}"
+        print(f"  ! 请输入 {choices}。", file=stream)
+
+
+def choose_menu(
+    title: str,
+    options: list[tuple[str, str]],
+    footer: tuple[str, str] | None = None,
+    *,
+    prompt: str = "请选择操作 › ",
+    default_key: str | None = None,
+    key_reader: Callable[[], str] | None = None,
+    stream: TextIOBase | None = None,
+    input_func: Callable[[str], str] | None = None,
+) -> str | None:
+    """支持方向键和数字输入双向绑定的通用单选菜单。"""
+    if not options:
+        return None
+    stream = stream or sys.stdout
+    input_func = input_func or input
+    if key_reader is None and not (
+        getattr(sys.stdin, "isatty", lambda: False)()
+        and getattr(stream, "isatty", lambda: False)()
+    ):
+        return _fallback_choose_menu(
+            title,
+            options,
+            footer,
+            prompt,
+            default_key,
+            input_func,
+            stream,
+        )
+
+    entries = list(options)
+    cancel_key: str | None = None
+    if footer and footer[0] != "Enter":
+        entries.append(footer)
+        cancel_key = footer[0]
+    focus_index = next(
+        (
+            index
+            for index, (key, _) in enumerate(entries)
+            if key == default_key
+        ),
+        0,
+    )
+    key_reader = key_reader or read_navigation_key
+    use_color = color_enabled(stream)
+    typed_digits = ""
+    rendered = False
+    terminal_size = shutil.get_terminal_size(fallback=(100, 24))
+    terminal_width = max(terminal_size.columns, 20)
+    visible_count = min(len(entries), max(terminal_size.lines - 6, 3))
+    line_count = visible_count + 4
+
+    def move_focus_for_number(number: str) -> bool:
+        nonlocal focus_index
+        exact_index = next(
+            (
+                index
+                for index, (key, _) in enumerate(entries)
+                if key == number
+            ),
+            None,
+        )
+        if exact_index is not None:
+            focus_index = exact_index
+            return True
+        prefix_index = next(
+            (
+                index
+                for index, (key, _) in enumerate(entries)
+                if key.startswith(number)
+            ),
+            None,
+        )
+        if prefix_index is not None:
+            focus_index = prefix_index
+            return True
+        return False
+
+    def render() -> None:
+        nonlocal rendered
+        if rendered:
+            stream.write(f"\033[{line_count}F")
+        viewport_start = min(
+            max(focus_index - visible_count // 2, 0),
+            len(entries) - visible_count,
+        )
+        viewport_end = viewport_start + visible_count
+        current_key = entries[focus_index][0]
+        input_status = f" · 输入 {typed_digits}" if typed_digits else ""
+        footer_label = footer[1] if footer else "取消"
+        lines: list[tuple[str, str]] = [
+            (
+                f"┌─ {title} · 当前 [{current_key}]{input_status}",
+                BOLD_CYAN,
+            ),
+            (
+                f"│  ↑/↓ 移动  ·  输入数字跳转  ·  Enter 确认"
+                f"  ·  Q {footer_label}",
+                CYAN,
+            ),
+            ("│", DIM),
+        ]
+        key_width = max(_display_width(key) for key, _ in entries)
+        for index in range(viewport_start, viewport_end):
+            key, label = entries[index]
+            focus = "›" if index == focus_index else " "
+            padded_key = key.rjust(key_width)
+            prefix = f"│  {focus} [{padded_key}] "
+            available_width = max(terminal_width - _display_width(prefix) - 1, 1)
+            displayed_label = _truncate_display(label, available_width)
+            row_color = BOLD_CYAN if index == focus_index else ""
+            lines.append((f"{prefix}{displayed_label}", row_color))
+        lines.append((f"└─ [Q] {footer_label}", DIM))
+        for line, line_color in lines:
+            line = _truncate_display(line, terminal_width - 1)
+            if use_color and line_color:
+                line = f"{line_color}{line}{RESET}"
+            prefix = "\r\033[2K" if rendered else ""
+            if prefix:
+                stream.write(prefix)
+            stream.write(line)
+            stream.write("\n")
+        stream.flush()
+        rendered = True
+
+    render()
+    while True:
+        key = key_reader()
+        if key == "up":
+            focus_index = (focus_index - 1) % len(entries)
+            typed_digits = ""
+            render()
+        elif key == "down":
+            focus_index = (focus_index + 1) % len(entries)
+            typed_digits = ""
+            render()
+        elif key.startswith("digit:"):
+            digit = key.split(":", 1)[1]
+            candidate = f"{typed_digits}{digit}"
+            if move_focus_for_number(candidate):
+                typed_digits = candidate
+            elif move_focus_for_number(digit):
+                typed_digits = digit
+            render()
+        elif key == "backspace":
+            typed_digits = typed_digits[:-1]
+            if typed_digits:
+                move_focus_for_number(typed_digits)
+            render()
+        elif key == "enter":
+            stream.write("\n")
+            stream.flush()
+            return entries[focus_index][0]
+        elif key == "cancel":
+            stream.write("\n")
+            stream.flush()
+            return cancel_key
 
 
 class ColorStream:

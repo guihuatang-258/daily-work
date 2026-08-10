@@ -778,7 +778,7 @@ class CliTests(unittest.TestCase):
         output = buffer.getvalue()
         self.assertIn("┌─ 通用 Workflow", output)
         self.assertIn("│  [1] 查看最近日志", output)
-        self.assertIn("└─ [Enter] 取消", output)
+        self.assertIn("└─ [0] 取消", output)
         self.assertNotIn("###", output)
         self.assertNotIn("`1`", output)
 

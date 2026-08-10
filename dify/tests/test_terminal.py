@@ -13,6 +13,7 @@ from dify_api.terminal import (
     GREEN,
     RED,
     RESET,
+    choose_menu,
     choose_multiple,
     color_enabled,
     style_text,
@@ -130,6 +131,76 @@ class TerminalTests(unittest.TestCase):
             input_func=lambda _prompt: next(answers),
         )
         self.assertEqual(selected, ["应用一", "应用三"])
+
+    def test_single_choice_binds_arrow_focus_to_number(self):
+        keys = iter(["down", "enter"])
+        stream = FakeTTY()
+        selected = choose_menu(
+            "测试菜单",
+            [("1", "第一项"), ("2", "第二项"), ("3", "第三项")],
+            ("0", "返回"),
+            key_reader=lambda: next(keys),
+            stream=stream,
+        )
+        self.assertEqual(selected, "2")
+        self.assertIn("当前 [2]", stream.getvalue())
+
+    def test_single_choice_binds_multi_digit_number_to_focus(self):
+        keys = iter(["digit:1", "digit:0", "enter"])
+        stream = FakeTTY()
+        selected = choose_menu(
+            "测试菜单",
+            [(str(index), f"第 {index} 项") for index in range(1, 13)],
+            ("0", "返回"),
+            key_reader=lambda: next(keys),
+            stream=stream,
+        )
+        self.assertEqual(selected, "10")
+        self.assertIn("当前 [10] · 输入 10", stream.getvalue())
+
+    def test_single_choice_can_focus_numeric_footer(self):
+        selected = choose_menu(
+            "测试菜单",
+            [("1", "第一项"), ("2", "第二项")],
+            ("0", "返回"),
+            key_reader=iter(["up", "enter"]).__next__,
+            stream=FakeTTY(),
+        )
+        self.assertEqual(selected, "0")
+
+    def test_single_choice_cancel_returns_footer_key(self):
+        stream = FakeTTY()
+        selected = choose_menu(
+            "测试菜单",
+            [("1", "第一项")],
+            ("0", "返回"),
+            key_reader=lambda: "cancel",
+            stream=stream,
+        )
+        self.assertEqual(selected, "0")
+        self.assertIn("Q 返回", stream.getvalue())
+
+    def test_single_choice_keeps_numeric_fallback(self):
+        selected = choose_menu(
+            "测试菜单",
+            [("1", "第一项"), ("2", "第二项")],
+            ("0", "返回"),
+            stream=StringIO(),
+            input_func=lambda _prompt: "2",
+        )
+        self.assertEqual(selected, "2")
+
+    def test_single_choice_first_render_keeps_lines_with_color_stream(self):
+        wrapped = FakeTTY()
+        choose_menu(
+            "测试菜单",
+            [("1", "第一项"), ("2", "第二项")],
+            ("0", "返回"),
+            key_reader=lambda: "enter",
+            stream=ColorStream(wrapped),
+        )
+        plain_output = re.sub(r"\x1b\[[0-9;]*m", "", wrapped.getvalue())
+        self.assertIn("│  › [1] 第一项\n│    [2] 第二项\n", plain_output)
 
 
 if __name__ == "__main__":

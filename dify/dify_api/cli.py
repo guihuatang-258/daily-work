@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+from collections.abc import Callable
 
 from .auth import (
     COOKIE_REFRESH_POPUP_ENV,
@@ -38,7 +39,7 @@ from .settings import (
     FLOW_GROUPS_PATH,
     INTERACTIVE_LOG_LIMIT,
 )
-from .terminal import choose_multiple
+from .terminal import choose_menu, choose_multiple
 from .workspace import ensure_expected_workspace
 
 
@@ -50,37 +51,31 @@ TOKEN_PERIOD_OPTIONS = [
 ]
 
 
-def print_console_menu(
-    title: str,
-    options: list[tuple[str, str]],
-    footer: tuple[str, str] | None = None,
-) -> None:
-    """输出无颜色、可稳定复制的 Unicode 终端菜单。"""
-    print()
-    print(f"┌─ {title}")
-    for key, label in options:
-        print(f"│  [{key}] {label}")
-    if footer:
-        print(f"└─ [{footer[0]}] {footer[1]}")
-    else:
-        print("└─")
-
-
-def choose_item(items: list, label: str) -> dict | None:
+def choose_item(
+    items: list,
+    label: str,
+    *,
+    title: str | None = None,
+    label_func: Callable[[dict], str] | None = None,
+) -> dict | None:
     if not items:
         print(f"没有可选择的{label}")
         return None
-    while True:
-        raw = input(f"请选择{label} [Enter 取消] › ").strip()
-        if not raw:
-            return None
-        if not raw.isdigit():
-            print("  ! 请输入数字编号。")
-            continue
-        index = int(raw)
-        if 1 <= index <= len(items):
-            return items[index - 1]
-        print(f"  ! 编号超出范围，请输入 1-{len(items)}。")
+    label_func = label_func or (
+        lambda item: str(item.get("name") or item.get("id") or "<未命名>")
+    )
+    choice = choose_menu(
+        title or f"选择{label}",
+        [
+            (str(index), label_func(item))
+            for index, item in enumerate(items, start=1)
+        ],
+        ("0", "取消"),
+        prompt=f"请选择{label} [Enter 取消] › ",
+    )
+    if not choice or choice == "0":
+        return None
+    return items[int(choice) - 1]
 
 
 def normalize_query_mode(raw: str) -> str | None:
@@ -124,7 +119,15 @@ def view_recent_workflow_logs(headers: dict, app_id: str) -> None:
         print("该工作流没有查询到最近日志。")
         return
     print_recent_workflow_logs(logs)
-    selected_log = choose_item(logs, "日志")
+    selected_log = choose_item(
+        logs,
+        "日志",
+        title="选择运行日志",
+        label_func=lambda item: (
+            f"{(item.get('workflow_run') or {}).get('id') or item.get('id')}"
+            f" · {(item.get('workflow_run') or {}).get('status') or '未知状态'}"
+        ),
+    )
     if not selected_log:
         print("已取消。")
         return
@@ -139,16 +142,15 @@ def view_recent_workflow_logs(headers: dict, app_id: str) -> None:
 
 
 def pick_quality_workflow_action(headers: dict, app_id: str) -> None:
-    print_console_menu(
+    choice = choose_menu(
         "质检打分 Workflow",
         [
             ("1", "查看最近日志（选一条查看运行详情）"),
             ("2", "按用户和质检项统计最近 Token 消耗"),
         ],
-        ("Enter", "取消"),
+        ("0", "取消"),
     )
-    choice = input("请选择操作 › ").strip()
-    if not choice:
+    if not choice or choice == "0":
         print("已取消。")
     elif choice == "2":
         print_quality_workflow_token_stats(headers, app_id)
@@ -159,16 +161,15 @@ def pick_quality_workflow_action(headers: dict, app_id: str) -> None:
 
 
 def pick_generic_workflow_action(headers: dict, app: dict) -> None:
-    print_console_menu(
+    choice = choose_menu(
         "通用 Workflow",
         [
             ("1", "查看最近日志（选一条查看运行详情）"),
             ("2", "按运行统计最近 Token 消耗"),
         ],
-        ("Enter", "取消"),
+        ("0", "取消"),
     )
-    choice = input("请选择操作 › ").strip()
-    if not choice:
+    if not choice or choice == "0":
         print("已取消。")
     elif choice == "2":
         pick_app_token_period(headers, app)
@@ -181,22 +182,16 @@ def pick_generic_workflow_action(headers: dict, app: dict) -> None:
 def choose_token_period(display_name: str) -> str | None:
     """显示统一的 Token 统计周期菜单并返回周期代码。"""
     periods = {choice: period for choice, _, period in TOKEN_PERIOD_OPTIONS}
-    periods[""] = "today"
-    while True:
-        print_console_menu(
-            f"{display_name} · Token 统计范围",
-            [
-                (choice, label)
-                for choice, label, _ in TOKEN_PERIOD_OPTIONS
-            ],
-            ("0", "返回主界面"),
-        )
-        choice = input("请选择统计范围 [默认 1] › ").strip()
-        if choice in periods:
-            return periods[choice]
-        if choice == "0":
-            return None
-        print("  ! 请输入 0、1、2、3、4，或直接回车。")
+    choice = choose_menu(
+        f"{display_name} · Token 统计范围",
+        [(choice, label) for choice, label, _ in TOKEN_PERIOD_OPTIONS],
+        ("0", "返回主界面"),
+        prompt="请选择统计范围 [默认 1] › ",
+        default_key="1",
+    )
+    if not choice or choice == "0":
+        return None
+    return periods[choice]
 
 
 def pick_flow_group_token_period(headers: dict, group_name: str) -> None:
@@ -245,21 +240,18 @@ def pick_failure_check_group(headers: dict) -> None:
         )
         for choice, group_name in group_choices.items()
     )
-    while True:
-        print_console_menu(
-            "失败 Run 检查范围", options, ("0", "返回主界面")
-        )
-        choice = input("请选择检查分组 › ").strip()
-        if choice == "0" or not choice:
-            return
-        if choice == "1":
-            print_group_failure_report(headers, list(groups))
-            return
-        if choice in group_choices:
-            print_group_failure_report(headers, [group_choices[choice]])
-            return
-        valid_choices = "、".join(["0", "1", *group_choices])
-        print(f"  ! 请输入 {valid_choices}。")
+    choice = choose_menu(
+        "失败 Run 检查范围",
+        options,
+        ("0", "返回主界面"),
+        prompt="请选择检查分组 › ",
+    )
+    if choice == "0" or not choice:
+        return
+    if choice == "1":
+        print_group_failure_report(headers, list(groups))
+        return
+    print_group_failure_report(headers, [group_choices[choice]])
 
 
 def load_groups_for_management() -> dict[str, dict] | None:
@@ -300,15 +292,14 @@ def choose_flow_group(groups: dict[str, dict]) -> str | None:
         {"group_name": name, "display_name": group.get("display_name") or name}
         for name, group in groups.items()
     ]
-    print_console_menu(
-        "选择业务组",
-        [
-            (str(index), f"{item['display_name']}（{item['group_name']}）")
-            for index, item in enumerate(items, start=1)
-        ],
-        ("Enter", "取消"),
+    selected = choose_item(
+        items,
+        "业务组",
+        title="选择业务组",
+        label_func=lambda item: (
+            f"{item['display_name']}（{item['group_name']}）"
+        ),
     )
-    selected = choose_item(items, "业务组")
     return selected["group_name"] if selected else None
 
 
@@ -396,15 +387,12 @@ def remove_group_app_interactively(
     if not apps:
         print("这个业务组中还没有应用。")
         return
-    print_console_menu(
-        "选择要移除的应用",
-        [
-            (str(index), app.get("name") or str(app.get("app_id")))
-            for index, app in enumerate(apps, start=1)
-        ],
-        ("Enter", "取消"),
+    selected = choose_item(
+        apps,
+        "应用",
+        title="选择要移除的应用",
+        label_func=lambda app: app.get("name") or str(app.get("app_id")),
     )
-    selected = choose_item(apps, "应用")
     if not selected:
         print("已取消。")
         return
@@ -432,7 +420,7 @@ def edit_flow_group_interactively(headers: dict, group_name: str) -> None:
             return
         group = groups[group_name]
         display_name = group.get("display_name") or group_name
-        print_console_menu(
+        choice = choose_menu(
             f"修改业务组 · {display_name}",
             [
                 ("1", "修改分组代号"),
@@ -442,7 +430,6 @@ def edit_flow_group_interactively(headers: dict, group_name: str) -> None:
             ],
             ("0", "返回"),
         )
-        choice = input("请选择操作 › ").strip()
         if choice == "0" or not choice:
             return
         if choice == "1":
@@ -501,7 +488,7 @@ def manage_flow_groups(headers: dict) -> None:
         groups = load_groups_for_management()
         if groups is None:
             return
-        print_console_menu(
+        choice = choose_menu(
             "管理业务组",
             [
                 ("1", "查看业务组"),
@@ -511,7 +498,6 @@ def manage_flow_groups(headers: dict) -> None:
             ],
             ("0", "返回主界面"),
         )
-        choice = input("请选择操作 › ").strip()
         if choice == "0" or not choice:
             return
         if choice == "1":
@@ -552,17 +538,20 @@ def choose_query_mode() -> str:
             options.append(
                 (choice, f"统计 · {display_name} Token 消耗")
             )
-        print_console_menu(
-            "Dify 日志查询工具", options, ("0", "退出")
+        raw = choose_menu(
+            "Dify 日志查询工具",
+            options,
+            ("0", "退出"),
+            prompt="请选择功能 [默认 1] › ",
+            default_key="1",
         )
-        raw = input("请选择功能 [默认 1] › ").strip()
         if raw == "3":
             return "failure-check"
         if raw == "4":
             return "manage-groups"
         if raw in group_choices:
             return f"flow-group:{group_choices[raw]}"
-        query_mode = normalize_query_mode(raw)
+        query_mode = normalize_query_mode(raw or "")
         if query_mode:
             return query_mode
         valid_choices = "、".join(
@@ -595,15 +584,12 @@ def interactive_pick_workflow_run(headers: dict, query_mode: str) -> None:
         else:
             print(f"没有查询到{mode_label}。")
         return
-    print_console_menu(
-        f"匹配到的{mode_label}",
-        [
-            (str(index), app.get("name") or "<未命名>")
-            for index, app in enumerate(apps, start=1)
-        ],
-        ("Enter", "取消"),
+    selected_app = choose_item(
+        apps,
+        mode_label,
+        title=f"匹配到的{mode_label}",
+        label_func=lambda app: app.get("name") or "<未命名>",
     )
-    selected_app = choose_item(apps, mode_label)
     if not selected_app:
         print("已取消。")
         return
