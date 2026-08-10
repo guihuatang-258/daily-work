@@ -507,7 +507,7 @@ def choose_query_mode() -> str:
             for index, group_name in enumerate(groups, start=4)
         }
         options = [
-            ("1", "检查 · 失败的 Run"),
+            ("1", "检查 · 失败的运行"),
             ("2", "查询 · Workflow"),
             ("3", "查询 · Chatflow"),
         ]
