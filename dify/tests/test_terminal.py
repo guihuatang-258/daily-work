@@ -60,7 +60,23 @@ class TerminalTests(unittest.TestCase):
         )
         self.assertEqual(selected, ["应用一", "应用三"])
         self.assertIn("[✓] 应用一", stream.getvalue())
-        self.assertIn("空格 选择", stream.getvalue())
+        self.assertIn("空格 勾选", stream.getvalue())
+        self.assertIn("┌─ 选择应用", stream.getvalue())
+        self.assertIn(BOLD_CYAN, stream.getvalue())
+        self.assertIn(GREEN, stream.getvalue())
+
+    def test_multiple_choice_respects_no_color(self):
+        stream = FakeTTY()
+        with patch.dict(os.environ, {"NO_COLOR": "1"}, clear=False):
+            choose_multiple(
+                ["应用一"],
+                lambda item: item,
+                "选择应用",
+                key_reader=lambda: "enter",
+                stream=stream,
+            )
+        self.assertNotIn(BOLD_CYAN, stream.getvalue())
+        self.assertNotIn(RESET, stream.getvalue())
 
     def test_multiple_choice_can_cancel(self):
         selected = choose_multiple(

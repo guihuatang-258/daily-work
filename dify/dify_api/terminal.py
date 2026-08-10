@@ -194,13 +194,14 @@ def choose_multiple(
         return _fallback_choose_multiple(items, labels, title, input_func, stream)
 
     key_reader = key_reader or read_navigation_key
+    use_color = color_enabled(stream)
     focus_index = 0
     selected_indexes: set[int] = set()
     rendered = False
     terminal_size = shutil.get_terminal_size(fallback=(100, 24))
     terminal_width = max(terminal_size.columns, 20)
-    visible_count = min(len(items), max(terminal_size.lines - 4, 3))
-    line_count = visible_count + 2
+    visible_count = min(len(items), max(terminal_size.lines - 6, 3))
+    line_count = visible_count + 4
 
     def render() -> None:
         nonlocal rendered
@@ -211,24 +212,39 @@ def choose_multiple(
             len(items) - visible_count,
         )
         viewport_end = viewport_start + visible_count
-        lines = [
+        lines: list[tuple[str, str]] = [
             (
-                f"{title}（{focus_index + 1}/{len(items)}，"
-                f"已选 {len(selected_indexes)}）"
+                f"┌─ {title} · {focus_index + 1}/{len(items)}"
+                f" · 已选 {len(selected_indexes)}",
+                BOLD_CYAN,
             ),
-            "↑/↓ 移动  空格 选择  Enter 确认  Q 取消",
+            (
+                "│  ↑/↓ 移动  ·  空格 勾选  ·  Enter 确认  ·  Q 取消",
+                CYAN,
+            ),
+            ("│", DIM),
         ]
         for index in range(viewport_start, viewport_end):
             label = labels[index]
             focus = "›" if index == focus_index else " "
             checkbox = "[✓]" if index in selected_indexes else "[ ]"
-            prefix = f"{focus} {checkbox} "
+            prefix = f"│  {focus} {checkbox} "
             available_width = max(terminal_width - _display_width(prefix) - 1, 1)
             displayed_label = _truncate_display(label, available_width)
-            lines.append(f"{prefix}{displayed_label}")
-        for line in lines:
+            if index == focus_index:
+                row_color = BOLD_CYAN
+            elif index in selected_indexes:
+                row_color = GREEN
+            else:
+                row_color = ""
+            lines.append((f"{prefix}{displayed_label}", row_color))
+        lines.append(("└─", DIM))
+        for line, line_color in lines:
             line = _truncate_display(line, terminal_width - 1)
-            stream.write(f"\r\033[2K{line}\n" if rendered else f"{line}\n")
+            if use_color and line_color:
+                line = f"{line_color}{line}{RESET}"
+            prefix = "\r\033[2K" if rendered else ""
+            stream.write(f"{prefix}{line}\n")
         stream.flush()
         rendered = True
 
