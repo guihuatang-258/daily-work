@@ -15,10 +15,15 @@ from .markdown import print_section, print_table
 from .settings import AUTH_TYPE, BASE_URL, ENV_PATH, PROJECT_DIR
 
 
-COOKIE_REFRESH_POPUP_ENV = "NEZHA_COOKIE_REFRESH_POPUP"
+COOKIE_REFRESH_POPUP_ENV = "DIFY_COOKIE_REFRESH_POPUP"
+LEGACY_COOKIE_REFRESH_POPUP_ENV = "NEZHA_COOKIE_REFRESH_POPUP"
 AUTH_ENV_NAMES = {
-    "cookie": "NEZHA_COOKIE",
+    "cookie": "DIFY_COOKIE",
     "authorization": "DIFY_AUTHORIZATION",
+}
+LEGACY_AUTH_ENV_NAMES = {
+    "cookie": ("NEZHA_COOKIE",),
+    "authorization": (),
 }
 AUTH_DISPLAY_NAMES = {
     "cookie": "Cookie",
@@ -104,7 +109,7 @@ def build_auth_headers(
     csrf_token = cookies.get("__Host-csrf_token")
     if not csrf_token:
         raise RuntimeError(
-            "NEZHA_COOKIE 中缺少 __Host-csrf_token，请检查 Cookie 是否完整"
+            "DIFY_COOKIE 中缺少 __Host-csrf_token，请检查 Cookie 是否完整"
         )
     headers["Cookie"] = cookie
     headers["X-CSRF-Token"] = csrf_token
@@ -119,7 +124,13 @@ def load_auth_headers(
     load_dotenv(path, override=True)
     selected_type = _resolve_auth_type(auth_type)
     env_name = AUTH_ENV_NAMES[selected_type]
-    return build_auth_headers(os.getenv(env_name, ""), selected_type)
+    credential = os.getenv(env_name, "")
+    if not credential:
+        for legacy_name in LEGACY_AUTH_ENV_NAMES[selected_type]:
+            credential = os.getenv(legacy_name, "")
+            if credential:
+                break
+    return build_auth_headers(credential, selected_type)
 
 
 def validate_auth_headers(
@@ -204,7 +215,7 @@ def refresh_auth_in_new_console() -> bool:
     """在新的可见命令行窗口中更新认证信息，并等待用户完成操作。"""
     if os.name != "nt":
         return False
-    entry_script = PROJECT_DIR / "analyze_nezha_apis.py"
+    entry_script = PROJECT_DIR / "main.py"
     child_env = dict(os.environ)
     child_env[COOKIE_REFRESH_POPUP_ENV] = "1"
     try:

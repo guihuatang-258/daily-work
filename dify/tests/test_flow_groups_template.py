@@ -4,7 +4,7 @@ import json
 import unittest
 from pathlib import Path
 
-from nezha_api.flow_groups import load_flow_groups
+from dify_api.flow_groups import load_flow_groups
 
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]

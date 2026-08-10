@@ -6,6 +6,7 @@ import sys
 
 from .auth import (
     COOKIE_REFRESH_POPUP_ENV,
+    LEGACY_COOKIE_REFRESH_POPUP_ENV,
     ensure_valid_auth_headers,
     load_auth_headers,
     refresh_auth_in_new_console,
@@ -387,7 +388,13 @@ def run_cookie_refresh() -> int:
     except (RuntimeError, SystemExit) as exc:
         print(f"\n认证信息更新未完成: {exc}")
         exit_code = 2
-    if exit_code != 0 and os.getenv(COOKIE_REFRESH_POPUP_ENV) == "1":
+    popup_env_names = (
+        COOKIE_REFRESH_POPUP_ENV,
+        LEGACY_COOKIE_REFRESH_POPUP_ENV,
+    )
+    if exit_code != 0 and any(
+        os.getenv(name) == "1" for name in popup_env_names
+    ):
         try:
             input("\n按回车键关闭此窗口...")
         except EOFError:

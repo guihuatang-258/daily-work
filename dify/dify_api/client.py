@@ -1,4 +1,4 @@
-"""哪吒控制台 API 请求与分页查询。"""
+"""Dify Console API 请求与分页查询。"""
 
 import urllib.parse
 from datetime import datetime
@@ -21,7 +21,7 @@ def request_json(url: str, headers: dict, timeout: int = 30) -> dict | list | No
         if response.status_code == 401:
             print(
                 "Token 已过期，请从浏览器重新获取 Cookie 并更新 "
-                ".env 中的 NEZHA_COOKIE。"
+                ".env 中的 DIFY_COOKIE。"
             )
             return None
         response.raise_for_status()

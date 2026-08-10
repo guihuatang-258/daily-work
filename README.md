@@ -25,13 +25,13 @@
 daily-work/
 ├─ README.md
 └─ dify/
-   ├─ analyze_nezha_apis.py          # 启动入口
+   ├─ main.py                        # 启动入口
    ├─ config.yaml                    # 通用监控配置
    ├─ dify_flow_groups.json          # 应用分组配置
-   ├─ nezha_api_response_examples.md # Console API 返回结构示例
+   ├─ dify_api_response_examples.md  # Console API 返回结构示例
    ├─ requirements.txt
    ├─ .env.example
-   ├─ nezha_api/
+   ├─ dify_api/
    │  ├─ config.py                   # YAML 配置加载与校验
    │  ├─ settings.py                 # 运行时配置映射
    │  ├─ auth.py                     # Cookie 与 CSRF 认证
@@ -42,7 +42,7 @@ daily-work/
    │  └─ cli.py                      # 命令行入口
    └─ tests/
       ├─ test_config.py
-      └─ test_nezha_api.py
+      └─ test_dify_api.py
 ```
 
 ## 运行环境
@@ -119,7 +119,7 @@ applications:
 
 ```powershell
 $env:DIFY_MONITOR_CONFIG = "C:\configs\dify-test.yaml"
-python analyze_nezha_apis.py
+python main.py
 ```
 
 这样可以为生产、测试和不同客户实例分别保存配置，而不修改代码。
@@ -140,10 +140,11 @@ authentication:
 Cookie 认证编辑 `.env`：
 
 ```env
-NEZHA_COOKIE="粘贴浏览器请求中的完整 Cookie"
+DIFY_COOKIE="粘贴浏览器请求中的完整 Cookie"
 ```
 
 Cookie 必须包含 `__Host-csrf_token`。程序会自动将该值作为 `X-CSRF-Token` 请求头。
+旧版 `.env` 中的 `NEZHA_COOKIE` 仍可继续使用；新配置建议统一改为 `DIFY_COOKIE`。
 
 Authorization 认证编辑 `.env`：
 
@@ -185,19 +186,19 @@ DIFY_AUTHORIZATION="粘贴浏览器请求中的完整 Authorization 值"
 ### 交互模式
 
 ```powershell
-python analyze_nezha_apis.py
+python main.py
 ```
 
 ### 检查指定业务组当天的失败运行
 
 ```powershell
-python analyze_nezha_apis.py --check-failures coach
+python main.py --check-failures coach
 ```
 
 同时检查多个组：
 
 ```powershell
-python analyze_nezha_apis.py --check-failures coach knowledge_search isa summary
+python main.py --check-failures coach knowledge_search isa summary
 ```
 
 业务组参数取自分组文件中 `groups` 对象的键。

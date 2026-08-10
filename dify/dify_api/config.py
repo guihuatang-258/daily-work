@@ -18,7 +18,7 @@ CONFIG_ENV_NAME = "DIFY_MONITOR_CONFIG"
 DEFAULT_CONFIG: dict[str, Any] = {
     "instance": {
         "name": "default",
-        "base_url": "https://nezha.cn-pgcloud.com",
+        "base_url": "https://dify.example.com",
         "timezone": "Asia/Shanghai",
         "workspace_id": "",
     },

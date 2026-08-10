@@ -1,4 +1,4 @@
-"""nezha_api 的离线单元测试。"""
+"""dify_api 的离线单元测试。"""
 
 import contextlib
 import io
@@ -13,13 +13,13 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from nezha_api.auth import build_auth_headers, load_auth_headers
-from nezha_api.client import (
+from dify_api.auth import build_auth_headers, load_auth_headers
+from dify_api.client import (
     list_all_apps,
     list_all_chat_conversations_in_range,
     list_workflow_logs,
 )
-from nezha_api.cli import (
+from dify_api.cli import (
     choose_query_mode,
     load_scheduled_auth_headers,
     normalize_query_mode,
@@ -29,23 +29,23 @@ from nezha_api.cli import (
     pick_generic_workflow_action,
     run_cookie_refresh,
 )
-from nezha_api.flow_groups import get_monitoring_time_range, load_flow_group
-from nezha_api.markdown import table
-from nezha_api.monitor import (
+from dify_api.flow_groups import get_monitoring_time_range, load_flow_group
+from dify_api.markdown import table
+from dify_api.monitor import (
     collect_app_failure_stats,
     print_group_failure_report,
 )
-from nezha_api.progress import format_progress
-from nezha_api.reports import (
+from dify_api.progress import format_progress
+from dify_api.reports import (
     print_flow_group_token_stats,
     print_workflow_run,
 )
-from nezha_api.settings import MONITOR_TIMEZONE
-from nezha_api.stats import (
+from dify_api.settings import MONITOR_TIMEZONE
+from dify_api.stats import (
     evenly_sample_workflow_runs,
     normalize_quality_user_id,
 )
-from nezha_api.workspace import ensure_expected_workspace, get_current_workspace
+from dify_api.workspace import ensure_expected_workspace, get_current_workspace
 
 
 class MarkdownTests(unittest.TestCase):
@@ -92,8 +92,8 @@ class MarkdownTests(unittest.TestCase):
             self.assertIn("| 运行 ID | run-1 |", output)
             self.assertTrue(output_path.exists())
 
-    @patch("nezha_api.reports.collect_flow_group_token_stats")
-    @patch("nezha_api.reports.load_flow_group")
+    @patch("dify_api.reports.collect_flow_group_token_stats")
+    @patch("dify_api.reports.load_flow_group")
     def test_flow_group_report_formats_numeric_columns(
         self, load_group, collect_stats
     ) -> None:
@@ -132,8 +132,8 @@ class MarkdownTests(unittest.TestCase):
         self.assertIn("- **成功次数：** 1,230", output)
         self.assertIn("- **失败次数：** 4", output)
 
-    @patch("nezha_api.reports.collect_flow_group_token_stats")
-    @patch("nezha_api.reports.load_flow_group")
+    @patch("dify_api.reports.collect_flow_group_token_stats")
+    @patch("dify_api.reports.load_flow_group")
     def test_flow_group_report_does_not_render_failed_fetch_as_zero(
         self, load_group, collect_stats
     ) -> None:
@@ -171,8 +171,8 @@ class MarkdownTests(unittest.TestCase):
         self.assertIn("- **成功次数：** 0 *", output)
         self.assertIn("- **失败次数：** 0 *", output)
 
-    @patch("nezha_api.monitor.collect_app_failure_stats")
-    @patch("nezha_api.monitor.load_flow_groups")
+    @patch("dify_api.monitor.collect_app_failure_stats")
+    @patch("dify_api.monitor.load_flow_groups")
     def test_failure_monitor_report_is_concise_markdown(
         self, load_groups, collect_stats
     ) -> None:
@@ -220,7 +220,7 @@ class MarkdownTests(unittest.TestCase):
 class DomainTests(unittest.TestCase):
     def test_shared_progress_bar_format(self) -> None:
         stream = SimpleNamespace(encoding="utf-8")
-        with patch("nezha_api.progress.sys.stdout", stream):
+        with patch("dify_api.progress.sys.stdout", stream):
             progress = format_progress(1, 4, width=4)
         self.assertIn("[█░░░]", progress)
         self.assertIn("1/4", progress)
@@ -228,13 +228,13 @@ class DomainTests(unittest.TestCase):
 
     def test_progress_bar_falls_back_for_legacy_console_encoding(self) -> None:
         stream = SimpleNamespace(encoding="ascii")
-        with patch("nezha_api.progress.sys.stdout", stream):
+        with patch("dify_api.progress.sys.stdout", stream):
             progress = format_progress(1, 4, width=4)
         self.assertIn("[#---]", progress)
 
     def test_empty_progress_is_complete(self) -> None:
         stream = SimpleNamespace(encoding="utf-8")
-        with patch("nezha_api.progress.sys.stdout", stream):
+        with patch("dify_api.progress.sys.stdout", stream):
             progress = format_progress(0, 0, width=4)
         self.assertEqual(progress, "[████] 0/0 100%")
 
@@ -269,8 +269,8 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(start.strftime("%Y-%m-%d %H:%M:%S"), "2026-07-16 00:00:00")
         self.assertEqual(end.strftime("%Y-%m-%d %H:%M:%S"), "2026-07-22 23:59:59")
 
-    @patch("nezha_api.monitor.list_all_chat_conversations_in_range")
-    @patch("nezha_api.monitor.list_workflow_logs")
+    @patch("dify_api.monitor.list_all_chat_conversations_in_range")
+    @patch("dify_api.monitor.list_workflow_logs")
     def test_failure_monitor_uses_server_side_failed_filter(
         self, workflow_logs, chat_conversations
     ) -> None:
@@ -335,7 +335,7 @@ class ClientAndAuthTests(unittest.TestCase):
             ("url-1", {"data": [{"id": "a"}], "has_more": True}),
             ("url-2", {"data": [{"id": "b"}], "has_more": False}),
         ]
-        with patch("nezha_api.client.list_workflow_apps", side_effect=responses):
+        with patch("dify_api.client.list_workflow_apps", side_effect=responses):
             urls, apps = list_all_apps({}, limit=1)
         self.assertEqual(urls, ["url-1", "url-2"])
         self.assertEqual([app["id"] for app in apps], ["a", "b"])
@@ -364,11 +364,33 @@ class ClientAndAuthTests(unittest.TestCase):
                 headers = load_auth_headers(env_path, "authorization")
         self.assertEqual(headers["Authorization"], "Bearer saved-token")
 
+    def test_load_cookie_from_generic_env_name(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            env_path = Path(directory) / ".env"
+            env_path.write_text(
+                'DIFY_COOKIE="foo=bar; __Host-csrf_token=generic-token"\n',
+                encoding="utf-8",
+            )
+            with patch.dict("os.environ", {}, clear=True):
+                headers = load_auth_headers(env_path, "cookie")
+        self.assertEqual(headers["X-CSRF-Token"], "generic-token")
+
+    def test_load_cookie_supports_legacy_env_name(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            env_path = Path(directory) / ".env"
+            env_path.write_text(
+                'NEZHA_COOKIE="foo=bar; __Host-csrf_token=legacy-token"\n',
+                encoding="utf-8",
+            )
+            with patch.dict("os.environ", {}, clear=True):
+                headers = load_auth_headers(env_path, "cookie")
+        self.assertEqual(headers["X-CSRF-Token"], "legacy-token")
+
     def test_auth_headers_reject_unknown_auth_type(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "认证类型"):
             build_auth_headers("secret", "unknown")
 
-    @patch("nezha_api.workspace.requests.get")
+    @patch("dify_api.workspace.requests.get")
     def test_get_current_workspace_uses_current_flag(self, request_get) -> None:
         request_get.return_value.json.return_value = {
             "workspaces": [
@@ -380,8 +402,8 @@ class ClientAndAuthTests(unittest.TestCase):
         self.assertEqual(current["id"], "workspace-2")
         request_get.assert_called_once()
 
-    @patch("nezha_api.workspace.WORKSPACE_ID", "workspace-1")
-    @patch("nezha_api.workspace.get_current_workspace")
+    @patch("dify_api.workspace.WORKSPACE_ID", "workspace-1")
+    @patch("dify_api.workspace.get_current_workspace")
     def test_workspace_validation_accepts_expected_workspace(
         self, get_workspace
     ) -> None:
@@ -396,8 +418,8 @@ class ClientAndAuthTests(unittest.TestCase):
         self.assertEqual(current["id"], "workspace-1")
         self.assertIn("Workspace 校验成功：Production", buffer.getvalue())
 
-    @patch("nezha_api.workspace.WORKSPACE_ID", "workspace-expected")
-    @patch("nezha_api.workspace.get_current_workspace")
+    @patch("dify_api.workspace.WORKSPACE_ID", "workspace-expected")
+    @patch("dify_api.workspace.get_current_workspace")
     def test_workspace_validation_rejects_wrong_workspace(
         self, get_workspace
     ) -> None:
@@ -409,7 +431,7 @@ class ClientAndAuthTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "请在 Dify 网页切回"):
             ensure_expected_workspace({"Cookie": "test"})
 
-    @patch("nezha_api.client.request_json", return_value={"data": []})
+    @patch("dify_api.client.request_json", return_value={"data": []})
     def test_workflow_logs_support_server_side_status_filter(
         self, request_json
     ) -> None:
@@ -426,7 +448,7 @@ class ClientAndAuthTests(unittest.TestCase):
         self.assertIn("created_at__after=", url)
         request_json.assert_called_once()
 
-    @patch("nezha_api.client.list_chat_conversations")
+    @patch("dify_api.client.list_chat_conversations")
     def test_chat_range_uses_api_minute_format(self, list_conversations) -> None:
         list_conversations.return_value = (
             "url",
@@ -447,7 +469,7 @@ class ClientAndAuthTests(unittest.TestCase):
 class CliTests(unittest.TestCase):
     @patch.dict("os.environ", {"NEZHA_COOKIE_REFRESH_POPUP": "1"})
     @patch("builtins.input")
-    @patch("nezha_api.cli.ensure_valid_auth_headers")
+    @patch("dify_api.cli.ensure_valid_auth_headers")
     def test_successful_cookie_refresh_closes_popup_automatically(
         self, ensure_auth, popup_input
     ) -> None:
@@ -457,16 +479,16 @@ class CliTests(unittest.TestCase):
         ensure_auth.assert_called_once_with()
         popup_input.assert_not_called()
 
-    @patch("nezha_api.cli.refresh_auth_in_new_console", return_value=True)
-    @patch("nezha_api.cli.ensure_expected_workspace")
+    @patch("dify_api.cli.refresh_auth_in_new_console", return_value=True)
+    @patch("dify_api.cli.ensure_expected_workspace")
     @patch(
-        "nezha_api.cli.validate_auth_headers",
+        "dify_api.cli.validate_auth_headers",
         side_effect=[
             ("expired", "认证已过期（HTTP 401）"),
             ("valid", "认证有效"),
         ],
     )
-    @patch("nezha_api.cli.load_auth_headers", return_value={"Cookie": "new"})
+    @patch("dify_api.cli.load_auth_headers", return_value={"Cookie": "new"})
     def test_scheduled_check_refreshes_expired_cookie_in_new_console(
         self, load_headers, _validate, ensure_workspace, refresh_console
     ) -> None:
@@ -480,7 +502,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("正在打开认证信息更新窗口", buffer.getvalue())
         self.assertIn("继续执行失败运行检查", buffer.getvalue())
 
-    @patch("nezha_api.cli.load_flow_groups")
+    @patch("dify_api.cli.load_flow_groups")
     @patch("builtins.input", return_value="0")
     def test_main_menu_keeps_plain_console_format(
         self, _input, load_groups
@@ -495,7 +517,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, "exit")
         self.assertIn("┌─ Dify 日志查询工具", output)
         self.assertNotIn("质检打分 Workflow", output)
-        self.assertIn("│  [1] 查询 · 通用 Workflow", output)
+        self.assertIn("│  [1] 查询 · Workflow", output)
         self.assertIn("│  [2] 查询 · Chatflow", output)
         self.assertIn("│  [3] 检查 ·", output)
         self.assertIn("│  [4] 统计 · Coach 组 Token 消耗", output)
@@ -510,7 +532,7 @@ class CliTests(unittest.TestCase):
         self.assertIsNone(normalize_query_mode("3"))
         self.assertIsNone(normalize_query_mode("quality-workflow"))
 
-    @patch("nezha_api.cli.load_flow_groups")
+    @patch("dify_api.cli.load_flow_groups")
     @patch("builtins.input", return_value="3")
     def test_main_menu_routes_failure_check(
         self, _input, load_groups
@@ -520,8 +542,8 @@ class CliTests(unittest.TestCase):
             result = choose_query_mode()
         self.assertEqual(result, "failure-check")
 
-    @patch("nezha_api.cli.print_group_failure_report")
-    @patch("nezha_api.cli.load_flow_groups")
+    @patch("dify_api.cli.print_group_failure_report")
+    @patch("dify_api.cli.load_flow_groups")
     def test_failure_check_menu_supports_single_group_and_all(
         self, load_groups, print_report
     ) -> None:
@@ -554,8 +576,8 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("###", output)
         self.assertNotIn("`1`", output)
 
-    @patch("nezha_api.cli.print_flow_group_token_stats")
-    @patch("nezha_api.cli.load_flow_group")
+    @patch("dify_api.cli.print_flow_group_token_stats")
+    @patch("dify_api.cli.load_flow_group")
     def test_period_menu_routes_new_periods(
         self, load_group, print_stats
     ) -> None:
@@ -575,8 +597,8 @@ class CliTests(unittest.TestCase):
                     {}, "test", expected_period
                 )
 
-    @patch("nezha_api.cli.print_apps_token_stats")
-    @patch("nezha_api.cli.choose_token_period", return_value="3d")
+    @patch("dify_api.cli.print_apps_token_stats")
+    @patch("dify_api.cli.choose_token_period", return_value="3d")
     def test_single_app_reuses_group_token_statistics(
         self, _choose_period, print_stats
     ) -> None:
@@ -598,7 +620,7 @@ class CliTests(unittest.TestCase):
             "3d",
         )
 
-    @patch("nezha_api.cli.pick_app_token_period")
+    @patch("dify_api.cli.pick_app_token_period")
     @patch("builtins.input", return_value="2")
     def test_generic_workflow_token_action_uses_common_period_flow(
         self, _input, pick_period

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from nezha_api.config import (
+from dify_api.config import (
     CONFIG_ENV_NAME,
     DEFAULT_CONFIG,
     get_config_value,

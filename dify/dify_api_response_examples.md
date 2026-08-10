@@ -1,15 +1,15 @@
-# 哪吒 Dify Console API 返回结构示例
+# Dify Console API 返回结构示例
 
-本文档整理 `analyze_nezha_apis.py` 当前使用的 API。示例已脱敏，字段值仅用于说明结构。
+本文档整理 `main.py` 当前使用的 API。示例已脱敏，字段值仅用于说明结构。
 
-> 这些接口属于 Dify Console 内部接口，并非稳定的公开 API。升级 Dify 或哪吒平台后，字段可能增加、缺省或调整。
+> 这些接口属于 Dify Console 内部接口，并非稳定的公开 API。升级 Dify 或部署平台后，字段可能增加、缺省或调整。
 
 ## 1. 公共约定
 
 ### 1.1 基础地址
 
 ```text
-https://nezha.cn-pgcloud.com
+https://dify.example.com
 ```
 
 ### 1.2 认证请求头
@@ -18,7 +18,7 @@ https://nezha.cn-pgcloud.com
 Cookie: <完整浏览器 Cookie>
 X-CSRF-Token: <Cookie 中的 __Host-csrf_token>
 Accept: application/json
-Referer: https://nezha.cn-pgcloud.com/console/apps
+Referer: https://dify.example.com/console/apps
 ```
 
 ### 1.3 常见字段格式

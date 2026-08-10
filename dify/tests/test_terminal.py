@@ -5,7 +5,7 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from nezha_api.terminal import (
+from dify_api.terminal import (
     BOLD_CYAN,
     CYAN,
     GREEN,
