@@ -203,6 +203,14 @@ python main.py --check-failures coach knowledge_search isa summary
 
 业务组参数取自分组文件中 `groups` 对象的键。
 
+报告会同时统计总 Run 和失败 Run，并区分以下状态：
+
+- `无运行`：检查时段内没有 Run。
+- `全部成功`：存在 Run，但失败数为 `0`。
+- `部分无运行`：分组内有些应用正常运行，有些应用没有 Run。
+- `存在失败`：至少发现一次失败运行。
+- `数据不完整`：接口请求或返回数据异常，不能据此判断运行情况。
+
 ## Token 统计说明
 
 Chatflow 会按会话和消息数据统计 Token。部分 Workflow 接口不能直接提供完整 Token 汇总，因此程序会抽样运行记录进行估算。输出中带 `~` 的数字表示估算值。

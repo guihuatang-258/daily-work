@@ -574,6 +574,11 @@ Chatflow 可以直接从消息 usage 精确汇总 input、output 和 total，无
 | Chatflow input/output/total | `chat-messages[].metadata.usage` | 精确 |
 | 异常 Workflow 数 | `workflow_run.status != "succeeded"` | 精确 |
 | 异常 Chatflow 消息数 | 消息 `status` 不属于正常状态集合 | 精确 |
+| 失败检查的 Workflow 总 Run | 不带 `status` 参数的 `workflow-app-logs.total` | 精确 |
+| 失败检查的 Workflow 失败 Run | 带 `status=failed` 的 `workflow-app-logs.total` | 精确 |
+| 失败检查的 Chatflow 总 Run | 会话 `status_count` 中各状态数量之和；字段为空时按该会话至少有 1 次运行计算 | 空字段时为保守值 |
+
+失败检查只有在接口数据完整且总 Run 为 `0` 时才判定为“无运行”；总 Run 大于 `0` 且失败 Run 为 `0` 时判定为“全部成功”。
 
 ## 10. 常见错误响应
 

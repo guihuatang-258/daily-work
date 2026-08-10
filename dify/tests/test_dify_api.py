@@ -191,6 +191,7 @@ class MarkdownTests(unittest.TestCase):
                 "group_name": "coach",
                 "name": "Flow A",
                 "mode": "workflow",
+                "total_runs": 5,
                 "failed": 1,
                 "complete": True,
             },
@@ -198,6 +199,7 @@ class MarkdownTests(unittest.TestCase):
                 "group_name": "knowledge_search",
                 "name": "Flow B",
                 "mode": "advanced-chat",
+                "total_runs": 0,
                 "failed": 0,
                 "complete": True,
             },
@@ -210,11 +212,84 @@ class MarkdownTests(unittest.TestCase):
             )
         output = buffer.getvalue()
         self.assertTrue(found)
-        self.assertIn("| Coach 组 | 1 | 1 | 检查完成 |", output)
-        self.assertIn("| KS组 | 1 | 0 | 检查完成 |", output)
+        self.assertIn("| Coach 组 | 1 | 5 | 1 | 存在失败 |", output)
+        self.assertIn("| KS组 | 1 | 0 | 0 | 无运行 |", output)
         self.assertIn("### 失败应用", output)
         self.assertIn("| Coach 组 | Flow A | workflow | 1 |", output)
-        self.assertIn("发现 **1** 次失败运行", output)
+        self.assertIn("### 无运行应用", output)
+        self.assertIn("| KS组 | Flow B | advanced-chat |", output)
+        self.assertIn("共 **5** 次运行，发现 **1** 次失败", output)
+
+    @patch("dify_api.monitor.collect_app_failure_stats")
+    @patch("dify_api.monitor.load_flow_groups")
+    def test_failure_report_distinguishes_no_runs_from_all_successful(
+        self, load_groups, collect_stats
+    ) -> None:
+        load_groups.return_value = {
+            "coach": {
+                "display_name": "Coach 组",
+                "apps": [
+                    {"app_id": "app-1", "name": "Active Flow"},
+                    {"app_id": "app-2", "name": "Idle Flow"},
+                ],
+            },
+        }
+        collect_stats.return_value = [
+            {
+                "group_name": "coach",
+                "name": "Active Flow",
+                "mode": "workflow",
+                "total_runs": 3,
+                "failed": 0,
+                "complete": True,
+            },
+            {
+                "group_name": "coach",
+                "name": "Idle Flow",
+                "mode": "workflow",
+                "total_runs": 0,
+                "failed": 0,
+                "complete": True,
+            },
+        ]
+        now = datetime(2026, 7, 27, 13, 0, tzinfo=MONITOR_TIMEZONE)
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            found = print_group_failure_report({}, ["coach"], now)
+        output = buffer.getvalue()
+        self.assertFalse(found)
+        self.assertIn("| Coach 组 | 2 | 3 | 0 | 部分无运行 |", output)
+        self.assertIn("| Coach 组 | Idle Flow | workflow |", output)
+        self.assertIn("共 **3** 次运行，未发现失败运行", output)
+        self.assertIn("有 1 个应用在检查时段内没有 Run", output)
+
+    @patch("dify_api.monitor.collect_app_failure_stats")
+    @patch("dify_api.monitor.load_flow_groups")
+    def test_failure_report_concludes_that_period_has_no_runs(
+        self, load_groups, collect_stats
+    ) -> None:
+        load_groups.return_value = {
+            "coach": {
+                "display_name": "Coach 组",
+                "apps": [{"app_id": "app-1", "name": "Idle Flow"}],
+            },
+        }
+        collect_stats.return_value = [{
+            "group_name": "coach",
+            "name": "Idle Flow",
+            "mode": "workflow",
+            "total_runs": 0,
+            "failed": 0,
+            "complete": True,
+        }]
+        now = datetime(2026, 7, 27, 13, 0, tzinfo=MONITOR_TIMEZONE)
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            found = print_group_failure_report({}, ["coach"], now)
+        output = buffer.getvalue()
+        self.assertFalse(found)
+        self.assertIn("| Coach 组 | 1 | 0 | 0 | 无运行 |", output)
+        self.assertIn("检查时段内没有发现 Run", output)
 
 
 class DomainTests(unittest.TestCase):
@@ -274,10 +349,10 @@ class DomainTests(unittest.TestCase):
     def test_failure_monitor_uses_server_side_failed_filter(
         self, workflow_logs, chat_conversations
     ) -> None:
-        workflow_logs.return_value = (
-            "url",
-            {"total": 7, "data": [{"workflow_run": {"status": "failed"}}]},
-        )
+        workflow_logs.side_effect = [
+            ("all-url", {"total": 10, "data": []}),
+            ("failed-url", {"total": 7, "data": []}),
+        ]
         chat_conversations.return_value = (
             [
                 {"status_count": {"success": 2, "failed": 1}},
@@ -303,16 +378,80 @@ class DomainTests(unittest.TestCase):
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
             stats = collect_app_failure_stats({}, apps, now, now)
+        self.assertEqual([item["total_runs"] for item in stats], [10, 7])
         self.assertEqual([item["failed"] for item in stats], [7, 4])
         progress = buffer.getvalue()
         self.assertIn("正在并行检查 2 个应用", progress)
         self.assertIn("每页 100", progress)
         self.assertIn("1/2", progress)
         self.assertIn("2/2", progress)
+        self.assertEqual(workflow_logs.call_count, 2)
+        total_call, failed_call = workflow_logs.call_args_list
+        self.assertNotIn("status", total_call.kwargs)
+        self.assertFalse(total_call.kwargs["detail"])
+        self.assertEqual(failed_call.kwargs["status"], "failed")
+        self.assertEqual(failed_call.kwargs["limit"], 100)
+
+    @patch("dify_api.monitor.list_workflow_logs")
+    def test_failure_monitor_marks_workflow_without_runs(
+        self, workflow_logs
+    ) -> None:
+        workflow_logs.return_value = ("url", {"total": 0, "data": []})
+        app = {
+            "app_id": "workflow-app",
+            "group_name": "coach",
+            "name": "Idle Workflow",
+            "mode": "workflow",
+        }
+        now = datetime(2026, 7, 27, 13, 0, tzinfo=MONITOR_TIMEZONE)
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            stats = collect_app_failure_stats({}, [app], now, now)
+        self.assertEqual(stats[0]["total_runs"], 0)
+        self.assertEqual(stats[0]["failed"], 0)
+        self.assertTrue(stats[0]["complete"])
+        self.assertIn("Idle Workflow：无运行", buffer.getvalue())
         workflow_logs.assert_called_once()
-        call = workflow_logs.call_args.kwargs
-        self.assertEqual(call["status"], "failed")
-        self.assertEqual(call["limit"], 100)
+
+    @patch("dify_api.monitor.list_all_chat_conversations_in_range")
+    def test_failure_monitor_marks_chatflow_without_runs(
+        self, chat_conversations
+    ) -> None:
+        chat_conversations.return_value = ([], True)
+        app = {
+            "app_id": "chat-app",
+            "group_name": "coach",
+            "name": "Idle Chatflow",
+            "mode": "advanced-chat",
+        }
+        now = datetime(2026, 7, 27, 13, 0, tzinfo=MONITOR_TIMEZONE)
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            stats = collect_app_failure_stats({}, [app], now, now)
+        self.assertEqual(stats[0]["total_runs"], 0)
+        self.assertEqual(stats[0]["failed"], 0)
+        self.assertTrue(stats[0]["complete"])
+        self.assertIn("Idle Chatflow：无运行", buffer.getvalue())
+
+    @patch("dify_api.monitor.list_all_chat_conversations_in_range")
+    def test_failure_monitor_counts_chatflow_with_empty_status_details(
+        self, chat_conversations
+    ) -> None:
+        chat_conversations.return_value = ([{"status_count": {}}], True)
+        app = {
+            "app_id": "chat-app",
+            "group_name": "coach",
+            "name": "Active Chatflow",
+            "mode": "advanced-chat",
+        }
+        now = datetime(2026, 7, 27, 13, 0, tzinfo=MONITOR_TIMEZONE)
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            stats = collect_app_failure_stats({}, [app], now, now)
+        self.assertEqual(stats[0]["total_runs"], 1)
+        self.assertEqual(stats[0]["failed"], 0)
+        self.assertTrue(stats[0]["complete"])
+        self.assertIn("Active Chatflow：运行 1，全部成功", buffer.getvalue())
 
     def test_yesterday_monitoring_range(self) -> None:
         now = datetime(2026, 7, 22, 12, 30, tzinfo=MONITOR_TIMEZONE)
